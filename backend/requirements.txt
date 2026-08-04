@@ -1,0 +1,17 @@
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+sqlalchemy==2.0.31
+psycopg2-binary==2.9.9
+python-dotenv==1.0.1
+httpx==0.27.0
+google-auth==2.30.0
+google-auth-oauthlib==1.2.0
+google-api-python-client==2.134.0
+pydantic==2.7.4
+python-multipart==0.0.9
+bcrypt==4.1.3
+pyjwt==2.8.0
+requests==2.31.0
+python-dateutil==2.9.0
+fpdf2==2.7.9
+weasyprint==69.0
