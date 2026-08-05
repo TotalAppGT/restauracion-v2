@@ -5156,20 +5156,38 @@ function usarWaContactosEnNotif(){
   var lbl=document.querySelector('#nfDestLabel');if(lbl)lbl.innerHTML='<i class="fas fa-users"></i> Destinatarios ('+_notifDest.length+')';
   toast(_notifDest.length+' contactos cargados en notificacion actual','ok');
 }
+function _leerCamposNotif(){
+  return {
+    tipo: g('nfTipo')||'general',
+    titulo: g('nfTitulo')||'',
+    mensaje: g('nfMensaje')||'',
+    evento: g('nfEvento')||'',
+    lugar: g('nfLugar')||'',
+    hora_evento: g('nfHoraEvento')||'',
+    fecha_evento: g('nfFechaEvento')||'',
+    cita_biblica: g('nfCita')||'',
+    info_extra: g('nfInfoExtra')||''
+  };
+}
 function testNotif(){
   var raw=(g('notifTestNum')||'').replace(/[^0-9]/g,'');
   if(raw.length===8)raw='502'+raw;
   if(!raw||raw.length<8){toast('Ingresa tus 8 digitos (ej: 58309505)','wa');return;}
+  var payload = _leerCamposNotif();
+  payload.numero = raw;
   loading(true);
-  call('enviarNotificacionPrueba',{numero:raw,mensaje:'Prueba de conexion - notificacion por WhatsApp',titulo:'Prueba de Conexion WhatsApp'},function(_,res){
+  call('enviarNotificacionPrueba',payload,function(_,res){
     loading(false);if(res&&res.ok){toast('Mensaje WhatsApp enviado a +502 '+raw.substring(3),'ok');loadNotifLog();}else toast('Error: '+(res&&res.msg||''),'er');
   });
 }
 function testNotifEmail(){
   var email=(g('notifTestEmail')||'').trim();
   if(!email||!/[^@\s]+@[^@\s]+\.[^@\s]+/.test(email)){toast('Ingresa un correo valido','wa');return;}
+  var payload = _leerCamposNotif();
+  payload.email = email;
+  payload.canal = 'correo';
   loading(true);
-  call('enviarNotificacionPrueba',{email:email,canal:'correo',mensaje:'Prueba de conexion - Notificacion por correo desde Iglesia Restauracion',titulo:'Prueba de Conexion Correo'},function(_,res){
+  call('enviarNotificacionPrueba',payload,function(_,res){
     loading(false);if(res&&res.ok){toast('Correo enviado a '+email,'ok');loadNotifLog();}else toast('Error: '+(res&&res.msg||''),'er');
   });
 }

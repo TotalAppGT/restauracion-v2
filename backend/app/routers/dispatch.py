@@ -1350,19 +1350,29 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             from app.models import NotificacionLog
             numero = str(payload.get("numero", "") or "").replace("+", "").replace(" ", "")
             email = str(payload.get("email", "") or "").strip()
-            mensaje = payload.get("mensaje", "")
+            tipo = str(payload.get("tipo", "") or "general").lower()
             titulo = payload.get("titulo", "")
+            mensaje = payload.get("mensaje", "")
+            evento = str(payload.get("evento", "") or "").strip()
+            lugar = str(payload.get("lugar", "") or "").strip()
+            hora_evento = str(payload.get("hora_evento", "") or "").strip()
+            fecha_evento = str(payload.get("fecha_evento", "") or "").strip()
+            cita_biblica = str(payload.get("cita_biblica", "") or "").strip()
+            info_extra = str(payload.get("info_extra", "") or "").strip()
             canal = str(payload.get("canal", "") or "whatsapp").lower()
+            msg_construido = _construir_mensaje_notificacion(
+                tipo, titulo, mensaje, evento, lugar, hora_evento, info_extra,
+                cita_biblica=cita_biblica, fecha_evento=fecha_evento
+            )
             if canal in ("correo", "email"):
-                if not email or not mensaje:
+                if not email or not msg_construido:
                     return {"ok": False, "msg": "Correo y mensaje requeridos"}
-                fecha = dt.now().strftime("%d/%m/%Y")
-                msg_wa = f"\U0001f4e2 {titulo + ' - ' if titulo else ''}{mensaje}  \U0001f4c5 {fecha}"
                 try:
                     esc = lambda s: (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-                    html = '<div style="font-family:sans-serif;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">'
+                    lineas_html = "".join(f'<div style="margin-bottom:8px">{esc(l)}</div>' for l in msg_construido.split("\n"))
+                    html = '<div style="font-family:sans-serif;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;max-width:520px">'
                     html += '<div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:20px"><b style="font-size:18px">Iglesia Restauracion</b><div style="font-size:13px;opacity:.9">Restaurando vidas y familias</div></div>'
-                    html += '<div style="padding:22px"><h2 style="color:#1a3a5c">'+esc(titulo or "Prueba")+'</h2><p style="color:#374151;line-height:1.6">'+esc(msg_wa).replace("\n","<br>")+'</p></div></div>'
+                    html += '<div style="padding:22px">'+lineas_html+'</div></div>'
                     send_email([email], f"Iglesia Restauracion - {titulo or 'Notificacion'}", html)
                     estado = "enviado"
                     destino = email
@@ -1377,11 +1387,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 ))
                 db.commit()
                 return res
-            if not numero or not mensaje:
+            if not numero or not msg_construido:
                 return {"ok": False, "msg": "Numero y mensaje requeridos"}
-            fecha = dt.now().strftime("%d/%m/%Y")
-            msg_wa = f"\U0001f4e2 {titulo + ' - ' if titulo else ''}{mensaje}  \U0001f4c5 {fecha}"
-            resp = send_whatsapp_template(numero, params=["Iglesia Restauracion", msg_wa])
+            resp = send_whatsapp_template(numero, params=["Iglesia Restauracion", msg_construido])
             db.add(NotificacionLog(
                 notificacion_id=0, titulo=titulo, destino=numero, canal="whatsapp",
                 wamid=resp.get("wamid", ""),
