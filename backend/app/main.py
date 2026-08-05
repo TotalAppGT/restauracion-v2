@@ -312,11 +312,12 @@ def _procesar_notificaciones_pendientes():
                     if not dests:
                         continue
                     wa_links = [d.get("walink", "") for d in dests if d.get("walink")]
-                    msg_wa = _construir_mensaje_notificacion(
+                    msg_raw = _construir_mensaje_notificacion(
                         n.tipo or "general", n.titulo, n.mensaje,
                         n.evento, n.lugar, n.hora_evento, n.info_extra,
                         cita_biblica=n.cita_biblica, fecha_evento=n.fecha_evento
                     )
+                    msg_wa = msg_raw.replace("\n", "  |  ")
                     if wa_links:
                         msg_wa += " | " + " | ".join(wa_links[:2])
                     for d in dests:
@@ -351,7 +352,7 @@ def _procesar_notificaciones_pendientes():
                         if quier_email and email:
                             try:
                                 subject = f"Iglesia Restauracion - {n.titulo or 'Notificacion'}"
-                                html = _construir_html_notificacion(n, msg_wa)
+                                html = _construir_html_notificacion(n, msg_raw)
                                 send_email([email], subject, html)
                                 log_estado = "enviado"
                                 log_error = ""
