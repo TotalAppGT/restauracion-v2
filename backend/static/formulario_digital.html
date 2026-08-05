@@ -383,17 +383,29 @@ function call(action,payload,cb){
 function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
 
 // Cargar logo y nombre desde config del sistema
-call('getConfig',{},function(err,cfg){
-  if(err||!cfg||!cfg.ok) return;
-  if(cfg.logoUrl){
-    const lw=document.getElementById('logoWrap');
-    if(lw) lw.innerHTML='<img src=\"'+cfg.logoUrl+'\" style=\"width:100%;height:100%;object-fit:cover\" alt=\"Logo\">';
-  }
-  if(cfg.nombre){
-    const ht=document.getElementById('hdrTitle');
-    if(ht) ht.textContent=cfg.nombre;
-  }
-});
+(function(){
+  var fallbackLogo='https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg';
+  var logoEl=document.getElementById('logoWrap');
+  call('getConfig',{},function(err,cfg){
+    var ht=document.getElementById('hdrTitle');
+    if(err||!cfg||!cfg.ok){
+      if(ht)ht.textContent='Iglesia Restauracion';
+      if(logoEl)logoEl.innerHTML='<img src=\"'+fallbackLogo+'\" style=\"width:100%;height:100%;object-fit:cover\" alt=\"Logo\" onerror=\"this.parentElement.innerHTML=\\'⛪\\'\">';
+      return;
+    }
+    var logoUrl=cfg.logoUrl||cfg.logo_url||fallbackLogo;
+    if(logoEl)logoEl.innerHTML='<img src=\"'+logoUrl+'\" style=\"width:100%;height:100%;object-fit:cover\" alt=\"Logo\" onerror=\"this.parentElement.innerHTML=\\'⛪\\'\">';
+    if(cfg.nombre){
+      if(ht)ht.textContent=cfg.nombre;
+    } else if(ht && ht.textContent==='Cargando...'){
+      ht.textContent='Iglesia Restauracion';
+    }
+  });
+  setTimeout(function(){
+    var ht=document.getElementById('hdrTitle');
+    if(ht&&ht.textContent==='Cargando...')ht.textContent='Iglesia Restauracion';
+  },5000);
+})();
 
 // Fecha hoy
 document.getElementById('fecha').value=new Date().toISOString().split('T')[0];
@@ -437,19 +449,22 @@ function onCodigoInput(){
   document.getElementById('liderNotFound').style.display='none';
   liderData=null;
   var q=document.getElementById('codigo').value.trim();
-  if(q.length<2){document.getElementById('codigoSugerencias').style.display='none';return;}
+  var sug=document.getElementById('codigoSugerencias');
+  if(q.length<2){sug.style.display='none';return;}
   clearTimeout(window._sugTimer);
+  sug.innerHTML='<div style=padding:12px;text-align:center;color:var(--tx3);font-size:13px>Buscando...</div>';
+  sug.style.display='block';
   window._sugTimer=setTimeout(function(){
     call('buscarLideres',{query:q},function(err,res){
       var sug=document.getElementById('codigoSugerencias');if(!sug)return;
+      if(err){sug.innerHTML='<div style=padding:12px;text-align:center;color:var(--er);font-size:13px>Error de conexion. Intenta de nuevo.</div>';return;}
       var data=(res&&res.data)||(Array.isArray(res)?res:[]);
-      if(!data||!data.length){sug.style.display='none';return;}
+      if(!data||!data.length){sug.innerHTML='<div style=padding:12px;text-align:center;color:var(--tx2);font-size:13px><i class=fas-fa-search></i> Sin resultados para &quot;'+esc(q)+'&quot;</div>';return;}
       sug.innerHTML=data.map(function(h){
         return '<div class=sug-item onclick=seleccionarLider(''+esc(h.CodigoL||'')+'') style=padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee onmouseenter=this.style.background='#f0f4ff' onmouseleave=this.style.background='#fff'>'
           +'<div style=font-weight:700;color:var(--pr);font-size:14px>'+esc(h.NombreL)+' <span style=font-family:monospace;font-size:12px;color:var(--pr2);margin-left:6px>'+esc(h.CodigoL)+'</span></div>'
           +'<div style=font-size:11px;color:var(--tx3)>D'+esc(h.Distrito)+' Z'+esc(h.Zona)+' | '+esc(h['Pastor Zona']||'-')+'</div></div>';
       }).join('');
-      sug.style.display='block';
     });
   },300);
 }
@@ -461,11 +476,16 @@ function seleccionarLider(codigo){
 function buscarLider(){
   const query=document.getElementById('codigo').value.trim();
   if(!query){notify('Ingresa un código o nombre','wa');return;}
-  const btn=document.querySelector('.card .btn-submit');btn.disabled=true;
+  const btn=document.querySelector('.card .btn-submit');
+  var origHTML=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<div class=spinner style=display:inline-block></div> Buscando...';
   document.getElementById('liderInfo').style.display='none';
   document.getElementById('liderNotFound').style.display='none';
   call('buscarLideres',{query:query},function(err,res){
     btn.disabled=false;
+    btn.innerHTML=origHTML;
+    if(err){notify('Error de conexion','er');return;}
     var data=(res&&res.data)||(Array.isArray(res)?res:[]);
     if(!data||!data.length){document.getElementById('liderNotFound').style.display='block';return;}
     if(data.length===1){
