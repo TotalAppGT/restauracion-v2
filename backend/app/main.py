@@ -288,13 +288,14 @@ def _procesar_notificaciones_pendientes():
                         n.evento, n.lugar, n.hora_evento, n.info_extra
                     )
                     if wa_links:
-                        msg_wa += " | " + " | ".join(wa_links[:2])
+                        msg_wa_msg = msg_wa[1] if isinstance(msg_wa, list) else msg_wa
+                        msg_wa[1] = msg_wa_msg
                     for d in dests:
                         num = str(d.get("numero", "")).replace("+", "").replace(" ", "").replace("-", "")
                         if not num or len(num) < 8:
                             continue
                         try:
-                            resp = send_whatsapp_template(num, params=[msg_wa])
+                            resp = send_whatsapp_template(num, params=msg_wa if isinstance(msg_wa, list) else [msg_wa])
                             log_estado = "enviado" if resp.get("ok") else "fallo"
                             log_wamid = resp.get("wamid", "")
                             log_error = str(resp.get("msg", ""))[:300]
