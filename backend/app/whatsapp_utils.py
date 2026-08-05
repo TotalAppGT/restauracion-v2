@@ -268,10 +268,21 @@ def send_whatsapp_template(to_number, template_name=None, params=None, internal_
             "template": {"name": tname, "language": {"code": WHATSAPP_TEMPLATE_LANG}}
         }
         if params:
-            body["template"]["components"] = [{
-                "type": "body",
-                "parameters": [{"type": "text", "text": str(p)} for p in params]
-            }]
+            if tname == "totalappgt_aviso":
+                if len(params) < 2:
+                    return {"ok": False, "msg": "totalappgt_aviso requiere 2 parametros (sistema, mensaje)"}
+                body["template"]["components"] = [{
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": str(params[0]), "parameter_name": "sistema"},
+                        {"type": "text", "text": str(params[1]), "parameter_name": "mensaje"}
+                    ]
+                }]
+            else:
+                body["template"]["components"] = [{
+                    "type": "body",
+                    "parameters": [{"type": "text", "text": str(p)} for p in params]
+                }]
         resp = httpx.post(
             WHATSAPP_API,
             json=body,
