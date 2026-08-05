@@ -50,35 +50,39 @@ def _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_e
     info_extra = (info_extra or "").strip()
     cita_biblica = (cita_biblica or "").strip()
     fecha_evento = (fecha_evento or "").strip()
-    fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+    ahora = datetime.now()
+    fecha_hoy = ahora.strftime("%d/%m/%Y")
+    DIAS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"]
+    dia_nombre = DIAS[ahora.weekday()]
 
     lineas = []
 
     if tipo == "recordatorio":
         lineas.append(f"*{titulo or 'Recordatorio'}*")
-        if fecha_evento: lineas.append(f"\U0001f4c5 Fecha: {fecha_evento}")
-        if hora_evento: lineas.append(f"\U0001f550 Hora: {hora_evento}")
+        lineas.append("Te recordamos el siguiente compromiso:")
+        if fecha_evento: lineas.append(f"\U0001f4c6 Día: {fecha_evento}")
+        if hora_evento: lineas.append(f"\U0001f550 Horario: {hora_evento}")
         if lugar: lineas.append(f"\U0001f3db Lugar: {lugar}")
-        if evento: lineas.append(f"\U0001f4e2 Evento: {evento}")
+        if evento: lineas.append(f"\U0001f4cb Detalle: {evento}")
         if mensaje: lineas.append(mensaje)
     elif tipo == "reunion":
-        lineas.append(f"*{titulo or 'Reunion'}*")
-        lineas.append("\U0001f465 Te esperamos en la reunion")
-        if fecha_evento: lineas.append(f"\U0001f4c5 Fecha: {fecha_evento}")
-        if hora_evento: lineas.append(f"\U0001f550 Hora: {hora_evento}")
+        lineas.append(f"*{titulo or 'Reunión'}*")
+        lineas.append("\U0001f465 Te invitamos cordialmente a nuestra reunión.")
+        if fecha_evento: lineas.append(f"\U0001f4c6 Día: {fecha_evento}")
+        if hora_evento: lineas.append(f"\U0001f550 Horario: {hora_evento}")
         if lugar: lineas.append(f"\U0001f3db Lugar: {lugar}")
         if mensaje: lineas.append(mensaje)
     elif tipo == "aviso":
-        lineas.append(f"*{titulo or 'Aviso'}*")
+        lineas.append(f"*{titulo or 'Comunicado'}*")
         if mensaje: lineas.append(mensaje)
-        if evento: lineas.append(f"\U0001f4c5 {evento}")
+        if evento: lineas.append(f"\U0001f4c6 {evento}")
         if hora_evento: lineas.append(f"\U0001f550 {hora_evento}")
         if lugar: lineas.append(f"\U0001f3db {lugar}")
     elif tipo == "reporte":
         lineas.append(f"*{titulo or 'Reporte'}*")
         if mensaje: lineas.append(mensaje)
         if info_extra: lineas.append(f"\U0001f4c4 {info_extra}")
-        lineas.append("\U0001f4ca Revisa los detalles del reporte")
+        lineas.append("\U0001f4ca Por favor revisa los detalles del reporte.")
     elif tipo == "alerta":
         lineas.append(f"\U000026a0 *{titulo or 'Alerta'}*")
         if mensaje: lineas.append(mensaje)
@@ -88,20 +92,20 @@ def _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_e
         if mensaje: lineas.append(mensaje)
         if info_extra: lineas.append(f"\U0001f4b8 {info_extra}")
     else:
-        lineas.append(f"*{titulo or 'Notificacion'}*")
+        lineas.append(f"*{titulo or 'Notificación'}*")
         if mensaje: lineas.append(mensaje)
-        if evento: lineas.append(f"\U0001f4c5 {evento}")
+        if evento: lineas.append(f"\U0001f4c6 {evento}")
         if hora_evento: lineas.append(f"\U0001f550 {hora_evento}")
         if lugar: lineas.append(f"\U0001f3db {lugar}")
 
     if cita_biblica:
-        lineas.append(f"\U0001f4d6 *Cita:* {cita_biblica}")
+        lineas.append(f"\U0001f4d6 Cita bíblica: {cita_biblica}")
 
     if info_extra and tipo not in ("reporte", "alerta", "ofrenda"):
         lineas.append(info_extra)
 
-    lineas.append(f"\U0001f4c5 {fecha_hoy}")
-    lineas.append("\U0001f517 redilrestauracion.totalappgt.online")
+    lineas.append(f"\U0001f4c5 Enviado el {dia_nombre} {fecha_hoy}")
+    lineas.append("\U0001f517 Ingresa al sistema: redilrestauracion.totalappgt.online")
     return "\n".join(lineas)
 
 ALL_MENU_IDS = [

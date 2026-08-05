@@ -4911,6 +4911,9 @@ function editNotif(id){
       }).join(''):'')+'</select>'
     +'<button class="btn btn-ac btn-sm" onclick="addGrupoDest()"><i class="fas fa-layer-group"></i> Agregar Grupo</button></div>'
     +'<div style="display:flex;gap:6px;margin-top:6px">'
+    +'<input class="fc" id="nfGid" placeholder="ID de grupo WhatsApp (120363...@g.us)" style="flex:1">'
+    +'<button class="btn btn-ol btn-sm" style="color:#128C7E;border-color:#128C7E" onclick="addDestGid()" title="Enviar al grupo por su ID"><i class="fas fa-users"></i> Grupo ID</button></div>'
+    +'<div style="display:flex;gap:6px;margin-top:6px">'
     +'<input class="fc" id="nfWALink" placeholder="Link de grupo WhatsApp (chat.whatsapp.com/...)" style="flex:1">'
     +'<button class="btn btn-ol btn-sm" onclick="addWALink()" style="color:#25D366;border-color:#25D366"><i class="fab fa-whatsapp"></i> Agregar Link</button></div>'
     +'<div id="notifDests" style="margin-top:8px;max-height:150px;overflow-y:auto"></div>'
@@ -4955,6 +4958,11 @@ function renderDestList(){
   var el=document.getElementById('nfDestList');if(!el)return;
   if(!_notifDest.length){el.innerHTML='<div style="color:var(--tx2);font-size:12px;padding:10px;background:#fafbfc;border-radius:8px;text-align:center"><i class="fas fa-user-plus"></i> Sin destinatarios.</div>';return;}
   el.innerHTML=_notifDest.map(function(d,i){
+    if(d.grupo_id){
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#e0f2f1;border-radius:8px;margin:4px 0;font-size:13px;border:1px solid #b2dfdb">'
+        +'<span><span class="bdg" style="background:#128C7E"><i class="fas fa-users"></i> Grupo</span> <b>'+esc(d.nombre||'Grupo WhatsApp')+'</b> <span style="font-size:10px;color:var(--tx2);font-family:monospace">ID: '+esc((d.grupo_id||'').substring(0,35))+'...</span></span>'
+        +'<button class="ab-btn ab-del" style="padding:4px 8px;font-size:11px;flex-shrink:0" onclick="removeDest('+i+')"><i class="fas fa-trash-alt"></i> Quitar</button></div>';
+    }
     if(d.walink){
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 10px;background:#e6f7e6;border-radius:8px;margin:4px 0;font-size:13px;border:1px solid #c8e6c9">'
         +'<span><i class="fab fa-whatsapp" style="color:#25D366"></i> <b>Grupo WhatsApp</b> <span style="font-size:11px;color:var(--tx2)">'+esc((d.walink||'').substring(0,40))+'...</span></span>'
@@ -5005,6 +5013,17 @@ function toggleHoraCustom(){
   var sel=document.getElementById('nfHora');var inp=document.getElementById('nfHoraCustom');
   if(!sel||!inp)return;
   if(sel.style.display==='none'){sel.style.display='';inp.style.display='none';}else{sel.style.display='none';inp.style.display='';}
+}
+function addDestGid(){
+  var gid=(g('nfGid')||'').trim();
+  if(!gid){toast('Ingresa el ID del grupo WhatsApp (ej. 120363...@g.us)','wa');return;}
+  var ya=_notifDest.some(function(d){return d.grupo_id===gid;});
+  if(ya){toast('Ese grupo ya esta agregado','wa');return;}
+  _notifDest.push({grupo_id:gid,nombre:'Grupo WhatsApp',numero:'',canal:'whatsapp'});
+  document.getElementById('nfGid').value='';
+  renderDestList();
+  var lbl=document.querySelector('#nfDestLabel');if(lbl)lbl.innerHTML='<i class="fas fa-users"></i> Destinatarios ('+_notifDest.length+')';
+  toast('Grupo por ID agregado','ok');
 }
 function addWALink(){
   var link=(g('nfWALink')||'').trim();

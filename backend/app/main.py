@@ -322,13 +322,15 @@ def _procesar_notificaciones_pendientes():
                     for d in dests:
                         num = str(d.get("numero", "") or "").replace("+", "").replace(" ", "").replace("-", "")
                         email = str(d.get("email", "") or d.get("correo", "") or "").strip()
+                        grupo_id = str(d.get("grupo_id", "") or d.get("gid", "") or "").strip()
                         canal = str(d.get("canal") or "").lower()
                         quier_wa = canal in ("", "whatsapp", "ambos")
-                        quier_email = canal in ("correo", "email", "ambos") or (canal == "" and email and not num)
-                        # Canal WHATSAPP
-                        if quier_wa and num and len(num) >= 8:
+                        quier_email = canal in ("correo", "email", "ambos") or (canal == "" and email and not num and not grupo_id)
+                        # Canal WHATSAPP (numero individual O grupo por ID)
+                        wa_target = grupo_id if grupo_id else num
+                        if quier_wa and wa_target and (len(wa_target) >= 8 or "@g.us" in wa_target):
                             try:
-                                resp = send_whatsapp_template(num, params=["Iglesia Restauracion", msg_wa])
+                                resp = send_whatsapp_template(wa_target, params=["Iglesia Restauracion", msg_wa])
                                 log_estado = "enviado" if resp.get("ok") else "fallo"
                                 log_wamid = resp.get("wamid", "")
                                 log_error = str(resp.get("msg", ""))[:300]
@@ -339,7 +341,7 @@ def _procesar_notificaciones_pendientes():
                             db.add(NotificacionLog(
                                 notificacion_id=n.id,
                                 titulo=n.titulo,
-                                destino=num,
+                                destino=wa_target,
                                 canal="whatsapp",
                                 wamid=log_wamid,
                                 estado=log_estado,
