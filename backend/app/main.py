@@ -58,6 +58,8 @@ try:
                 lugar VARCHAR(200) DEFAULT '',
                 hora_evento VARCHAR(10) DEFAULT '',
                 info_extra VARCHAR(300) DEFAULT '',
+                cita_biblica VARCHAR(300) DEFAULT '',
+                fecha_evento VARCHAR(20) DEFAULT '',
                 frecuencia VARCHAR(20) DEFAULT 'una_vez',
                 dia_semana INTEGER,
                 dia_mes INTEGER,
@@ -89,9 +91,14 @@ try:
                               ("evento","VARCHAR(200) DEFAULT ''"),
                               ("lugar","VARCHAR(200) DEFAULT ''"),
                               ("hora_evento","VARCHAR(10) DEFAULT ''"),
-                              ("info_extra","VARCHAR(300) DEFAULT ''")]:
+                              ("info_extra","VARCHAR(300) DEFAULT ''"),
+                              ("cita_biblica","VARCHAR(300) DEFAULT ''"),
+                              ("fecha_evento","VARCHAR(20) DEFAULT ''")]:
                 if col not in cols_notif:
                     conn.execute(text(f"ALTER TABLE notificaciones ADD COLUMN {col} {defn}"))
+            cols_log = [c["name"] for c in inspector.get_columns("notificaciones_log")]
+            if "canal" not in cols_log:
+                conn.execute(text("ALTER TABLE notificaciones_log ADD COLUMN canal VARCHAR(20) DEFAULT 'whatsapp'"))
             conn.commit()
         except Exception:
             pass
@@ -245,6 +252,26 @@ async def form_redirect():
 import threading, time, json as json_mod
 from datetime import datetime, timedelta
 
+def _construir_html_notificacion(n, cuerpo_texto):
+    """HTML profesional para correos de notificacion con el nombre de la iglesia."""
+    esc_html = lambda s: (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;")
+    titulo = esc_html(n.titulo or "Notificacion")
+    cuerpo = esc_html(cuerpo_texto or "").replace("\n", "<br>")
+    return f"""
+    <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
+      <div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:24px 28px">
+        <div style="font-size:20px;font-weight:bold">&#128141; Iglesia Restauracion</div>
+        <div style="font-size:13px;opacity:.9;margin-top:2px">Restaurando vidas y familias</div>
+      </div>
+      <div style="padding:28px">
+        <h2 style="margin:0 0 16px;color:#1a3a5c;font-size:18px">{titulo}</h2>
+        <div style="background:#f8fafc;border:1px solid #eef0f5;border-radius:8px;padding:18px;color:#374151;line-height:1.55;font-size:14px;white-space:pre-line">{cuerpo}</div>
+        <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eef0f5;font-size:12px;color:#9ca3af;text-align:center">
+          Iglesia Restauracion &middot; <a href="https://redilrestauracion.totalappgt.online" style="color:#2563a8">redilrestauracion.totalappgt.online</a>
+        </div>
+      </div>
+    </div>"""
+
 def _procesar_notificaciones_pendientes():
     while True:
         time.sleep(60)
@@ -252,19 +279,23 @@ def _procesar_notificaciones_pendientes():
             from app.database import SessionLocal
             from app.models import Notificacion, NotificacionLog
             from app.whatsapp_utils import send_whatsapp_template
+            from app.routers.dispatch import _construir_mensaje_notificacion
+            from app.email_utils import send_email
             db = SessionLocal()
             try:
                 ahora = datetime.utcnow()
                 notifs = db.query(Notificacion).filter(Notificacion.activo == True).all()
                 for n in notifs:
-                    if n.ultimo_envio and n.frecuencia == "una_vez":
-                        continue
                     hora_e = str(n.hora_envio or "08:00")
                     hora_actual = ahora.strftime("%H:%M")
                     if hora_actual != hora_e:
                         continue
                     debe_enviar = False
-                    if n.frecuencia == "diaria":
+                    if n.frecuencia == "una_vez":
+                        if n.ultimo_envio:
+                            continue
+                        debe_enviar = True
+                    elif n.frecuencia == "diaria":
                         debe_enviar = not n.ultimo_envio or n.ultimo_envio.date() < ahora.date()
                     elif n.frecuencia == "semanal":
                         if n.dia_semana is not None and ahora.weekday() == n.dia_semana:
@@ -280,36 +311,60 @@ def _procesar_notificaciones_pendientes():
                         dests = []
                     if not dests:
                         continue
-                    # Extraer links de grupos WhatsApp
                     wa_links = [d.get("walink", "") for d in dests if d.get("walink")]
-                    from app.routers.dispatch import _construir_mensaje_notificacion
                     msg_wa = _construir_mensaje_notificacion(
                         n.tipo or "general", n.titulo, n.mensaje,
-                        n.evento, n.lugar, n.hora_evento, n.info_extra
+                        n.evento, n.lugar, n.hora_evento, n.info_extra,
+                        cita_biblica=n.cita_biblica, fecha_evento=n.fecha_evento
                     )
                     if wa_links:
                         msg_wa += " | " + " | ".join(wa_links[:2])
                     for d in dests:
-                        num = str(d.get("numero", "")).replace("+", "").replace(" ", "").replace("-", "")
-                        if not num or len(num) < 8:
-                            continue
-                        try:
-                            resp = send_whatsapp_template(num, params=["Iglesia Restauracion", msg_wa])
-                            log_estado = "enviado" if resp.get("ok") else "fallo"
-                            log_wamid = resp.get("wamid", "")
-                            log_error = str(resp.get("msg", ""))[:300]
-                        except Exception as e:
-                            log_estado = "error"
-                            log_wamid = ""
-                            log_error = str(e)[:300]
-                        db.add(NotificacionLog(
-                            notificacion_id=n.id,
-                            titulo=n.titulo,
-                            destino=num,
-                            wamid=log_wamid,
-                            estado=log_estado,
-                            error_msg=log_error,
-                        ))
+                        num = str(d.get("numero", "") or "").replace("+", "").replace(" ", "").replace("-", "")
+                        email = str(d.get("email", "") or d.get("correo", "") or "").strip()
+                        canal = str(d.get("canal") or "").lower()
+                        quier_wa = canal in ("", "whatsapp", "ambos")
+                        quier_email = canal in ("correo", "email", "ambos") or (canal == "" and email and not num)
+                        # Canal WHATSAPP
+                        if quier_wa and num and len(num) >= 8:
+                            try:
+                                resp = send_whatsapp_template(num, params=["Iglesia Restauracion", msg_wa])
+                                log_estado = "enviado" if resp.get("ok") else "fallo"
+                                log_wamid = resp.get("wamid", "")
+                                log_error = str(resp.get("msg", ""))[:300]
+                            except Exception as e:
+                                log_estado = "error"
+                                log_wamid = ""
+                                log_error = str(e)[:300]
+                            db.add(NotificacionLog(
+                                notificacion_id=n.id,
+                                titulo=n.titulo,
+                                destino=num,
+                                canal="whatsapp",
+                                wamid=log_wamid,
+                                estado=log_estado,
+                                error_msg=log_error,
+                            ))
+                        # Canal CORREO
+                        if quier_email and email:
+                            try:
+                                subject = f"Iglesia Restauracion - {n.titulo or 'Notificacion'}"
+                                html = _construir_html_notificacion(n, msg_wa)
+                                send_email([email], subject, html)
+                                log_estado = "enviado"
+                                log_error = ""
+                            except Exception as e:
+                                log_estado = "fallo"
+                                log_error = str(e)[:300]
+                            db.add(NotificacionLog(
+                                notificacion_id=n.id,
+                                titulo=n.titulo,
+                                destino=email,
+                                canal="correo",
+                                wamid="",
+                                estado=log_estado,
+                                error_msg=log_error,
+                            ))
                     n.ultimo_envio = ahora
                     db.commit()
             finally:

@@ -37,33 +37,72 @@ def _formatear_whatsapp(msg, pdf_url=""):
         return f"\U0001f4ca \U0001f4c4 {msg}{sep}\U0001f4c5 {fecha}"
     return f"\U0001f514 {msg}{sep}\U0001f4c5 {fecha}"
 
-def _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_evento, info_extra):
-    sep = " | "
-    p = []
-    if tipo == "recordatorio":
-        p = [f"\U0001f514 *REDIL Restauracion*", f"\U0001f4e2 *{titulo or evento or 'Recordatorio'}*"]
-        if evento: p.append(f"\U0001f4c5 {evento}")
-        if hora_evento: p.append(f"\U0001f550 {hora_evento}")
-        if lugar: p.append(f"\U0001f3db {lugar}")
-        if mensaje: p.append(f"\U0001f4cb {mensaje}")
-    elif tipo == "reporte":
-        p = [f"\U0001f4ca *REDIL Restauracion*", f"\U0001f4c4 *{titulo or 'Informe'}*"]
-        if mensaje: p.append(mensaje)
-    elif tipo == "alerta":
-        p = [f"\U000026a0 *REDIL Restauracion*", f"\U0001f6a8 *{titulo or mensaje or 'Alerta'}*"]
-        if mensaje and titulo: p.append(mensaje)
-    else:
-        p = [f"\U0001f514 *REDIL Restauracion*"]
-        if titulo: p.append(f"\U0001f4e2 {titulo}")
-        if mensaje: p.append(mensaje)
-        if evento: p.append(f"\U0001f4c5 {evento}")
-        if hora_evento: p.append(f"\U0001f550 {hora_evento}")
-        if lugar: p.append(f"\U0001f3db {lugar}")
-    if info_extra: p.append(info_extra)
+def _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_evento, info_extra, cita_biblica=None, fecha_evento=None):
+    """Construye el cuerpo del mensaje según el tipo. El titulo de la iglesia lo pone
+    la plantilla ({{sistema}} = Iglesia Restauracion); aqui se envian los DETALLES."""
     from datetime import datetime
-    p.append(f"\U0001f4c5 {datetime.now().strftime('%d/%m/%Y')}")
-    p.append("\U0001f517 redilrestauracion.totalappgt.online")
-    return sep.join(p)
+    tipo = (tipo or "general").lower()
+    titulo = (titulo or "").strip()
+    mensaje = (mensaje or "").strip()
+    evento = (evento or "").strip()
+    lugar = (lugar or "").strip()
+    hora_evento = (hora_evento or "").strip()
+    info_extra = (info_extra or "").strip()
+    cita_biblica = (cita_biblica or "").strip()
+    fecha_evento = (fecha_evento or "").strip()
+    fecha_hoy = datetime.now().strftime("%d/%m/%Y")
+
+    lineas = []
+
+    if tipo == "recordatorio":
+        lineas.append(f"*{titulo or 'Recordatorio'}*")
+        if fecha_evento: lineas.append(f"\U0001f4c5 Fecha: {fecha_evento}")
+        if hora_evento: lineas.append(f"\U0001f550 Hora: {hora_evento}")
+        if lugar: lineas.append(f"\U0001f3db Lugar: {lugar}")
+        if evento: lineas.append(f"\U0001f4e2 Evento: {evento}")
+        if mensaje: lineas.append(mensaje)
+    elif tipo == "reunion":
+        lineas.append(f"*{titulo or 'Reunion'}*")
+        lineas.append("\U0001f465 Te esperamos en la reunion")
+        if fecha_evento: lineas.append(f"\U0001f4c5 Fecha: {fecha_evento}")
+        if hora_evento: lineas.append(f"\U0001f550 Hora: {hora_evento}")
+        if lugar: lineas.append(f"\U0001f3db Lugar: {lugar}")
+        if mensaje: lineas.append(mensaje)
+    elif tipo == "aviso":
+        lineas.append(f"*{titulo or 'Aviso'}*")
+        if mensaje: lineas.append(mensaje)
+        if evento: lineas.append(f"\U0001f4c5 {evento}")
+        if hora_evento: lineas.append(f"\U0001f550 {hora_evento}")
+        if lugar: lineas.append(f"\U0001f3db {lugar}")
+    elif tipo == "reporte":
+        lineas.append(f"*{titulo or 'Reporte'}*")
+        if mensaje: lineas.append(mensaje)
+        if info_extra: lineas.append(f"\U0001f4c4 {info_extra}")
+        lineas.append("\U0001f4ca Revisa los detalles del reporte")
+    elif tipo == "alerta":
+        lineas.append(f"\U000026a0 *{titulo or 'Alerta'}*")
+        if mensaje: lineas.append(mensaje)
+        if info_extra: lineas.append(f"\U0001f6a8 {info_extra}")
+    elif tipo == "ofrenda":
+        lineas.append(f"*{titulo or 'Ofrenda'}*")
+        if mensaje: lineas.append(mensaje)
+        if info_extra: lineas.append(f"\U0001f4b8 {info_extra}")
+    else:
+        lineas.append(f"*{titulo or 'Notificacion'}*")
+        if mensaje: lineas.append(mensaje)
+        if evento: lineas.append(f"\U0001f4c5 {evento}")
+        if hora_evento: lineas.append(f"\U0001f550 {hora_evento}")
+        if lugar: lineas.append(f"\U0001f3db {lugar}")
+
+    if cita_biblica:
+        lineas.append(f"\U0001f4d6 *Cita:* {cita_biblica}")
+
+    if info_extra and tipo not in ("reporte", "alerta", "ofrenda"):
+        lineas.append(info_extra)
+
+    lineas.append(f"\U0001f4c5 {fecha_hoy}")
+    lineas.append("\U0001f517 redilrestauracion.totalappgt.online")
+    return "\n".join(lineas)
 
 ALL_MENU_IDS = [
     'dashboard','reportes','reporteDigital','formulario','generador',
@@ -1228,6 +1267,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 {"id": n.id, "titulo": n.titulo, "mensaje": n.mensaje,
                  "tipo": n.tipo, "evento": n.evento, "lugar": n.lugar,
                  "hora_evento": n.hora_evento, "info_extra": n.info_extra,
+                 "cita_biblica": n.cita_biblica, "fecha_evento": n.fecha_evento,
                  "frecuencia": n.frecuencia, "dia_semana": n.dia_semana,
                  "dia_mes": n.dia_mes, "hora_envio": n.hora_envio,
                  "activo": n.activo, "destinatarios": n.destinatarios,
@@ -1247,6 +1287,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             lugar = payload.get("lugar", "")
             hora_evento = payload.get("hora_evento", "")
             info_extra = payload.get("info_extra", "")
+            cita_biblica = payload.get("cita_biblica", "")
+            fecha_evento = payload.get("fecha_evento", "")
             frecuencia = payload.get("frecuencia", "una_vez")
             dia_s = payload.get("dia_semana")
             dia_m = payload.get("dia_mes")
@@ -1258,22 +1300,23 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 dests = json.dumps(dests, ensure_ascii=False)
             if not mensaje and not evento:
                 return {"ok": False, "msg": "Mensaje o evento requerido"}
-            mensaje_final = _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_evento, info_extra)
             if nid:
                 n = db.query(Notificacion).filter(Notificacion.id == nid).first()
                 if not n:
                     return {"ok": False, "msg": "Notificacion no encontrada"}
-                n.titulo = titulo; n.mensaje = mensaje_final
+                n.titulo = titulo; n.mensaje = mensaje
                 n.tipo = tipo; n.evento = evento; n.lugar = lugar
                 n.hora_evento = hora_evento; n.info_extra = info_extra
+                n.cita_biblica = cita_biblica; n.fecha_evento = fecha_evento
                 n.frecuencia = frecuencia
                 n.dia_semana = int(dia_s) if dia_s is not None else None
                 n.dia_mes = int(dia_m) if dia_m is not None else None
                 n.hora_envio = hora; n.activo = activo; n.destinatarios = dests
             else:
                 n = Notificacion(
-                    titulo=titulo, mensaje=mensaje_final, tipo=tipo,
+                    titulo=titulo, mensaje=mensaje, tipo=tipo,
                     evento=evento, lugar=lugar, hora_evento=hora_evento, info_extra=info_extra,
+                    cita_biblica=cita_biblica, fecha_evento=fecha_evento,
                     frecuencia=frecuencia,
                     dia_semana=int(dia_s) if dia_s is not None else None,
                     dia_mes=int(dia_m) if dia_m is not None else None,
@@ -1298,18 +1341,45 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         if action == "enviarNotificacionPrueba":
             from app.whatsapp_utils import send_whatsapp_template
+            from app.email_utils import send_email
             from datetime import datetime as dt
             from app.models import NotificacionLog
-            numero = str(payload.get("numero", "")).replace("+", "").replace(" ", "")
+            numero = str(payload.get("numero", "") or "").replace("+", "").replace(" ", "")
+            email = str(payload.get("email", "") or "").strip()
             mensaje = payload.get("mensaje", "")
             titulo = payload.get("titulo", "")
+            canal = str(payload.get("canal", "") or "whatsapp").lower()
+            if canal in ("correo", "email"):
+                if not email or not mensaje:
+                    return {"ok": False, "msg": "Correo y mensaje requeridos"}
+                fecha = dt.now().strftime("%d/%m/%Y")
+                msg_wa = f"\U0001f4e2 {titulo + ' - ' if titulo else ''}{mensaje}  \U0001f4c5 {fecha}"
+                try:
+                    esc = lambda s: (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+                    html = '<div style="font-family:sans-serif;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">'
+                    html += '<div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:20px"><b style="font-size:18px">Iglesia Restauracion</b><div style="font-size:13px;opacity:.9">Restaurando vidas y familias</div></div>'
+                    html += '<div style="padding:22px"><h2 style="color:#1a3a5c">'+esc(titulo or "Prueba")+'</h2><p style="color:#374151;line-height:1.6">'+esc(msg_wa).replace("\n","<br>")+'</p></div></div>'
+                    send_email([email], f"Iglesia Restauracion - {titulo or 'Notificacion'}", html)
+                    estado = "enviado"
+                    destino = email
+                    res = {"ok": True, "msg": "Enviado", "canal": "correo"}
+                except Exception as e:
+                    estado = "fallo"
+                    destino = email
+                    res = {"ok": False, "msg": str(e)[:300]}
+                db.add(NotificacionLog(
+                    notificacion_id=0, titulo=titulo, destino=destino, canal="correo",
+                    wamid="", estado=estado, error_msg=str(res.get('msg',''))[:300]
+                ))
+                db.commit()
+                return res
             if not numero or not mensaje:
                 return {"ok": False, "msg": "Numero y mensaje requeridos"}
             fecha = dt.now().strftime("%d/%m/%Y")
             msg_wa = f"\U0001f4e2 {titulo + ' - ' if titulo else ''}{mensaje}  \U0001f4c5 {fecha}"
             resp = send_whatsapp_template(numero, params=["Iglesia Restauracion", msg_wa])
             db.add(NotificacionLog(
-                notificacion_id=0, titulo=titulo, destino=numero,
+                notificacion_id=0, titulo=titulo, destino=numero, canal="whatsapp",
                 wamid=resp.get("wamid", ""),
                 estado="enviado" if resp.get("ok") else "fallo",
                 error_msg=str(resp.get("msg", ""))[:300]
@@ -1322,7 +1392,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             rows = db.query(NotificacionLog).order_by(NotificacionLog.fecha.desc()).limit(200).all()
             return {"ok": True, "data": [
                 {"id": r.id, "notificacion_id": r.notificacion_id,
-                 "titulo": r.titulo, "destino": r.destino,
+                 "titulo": r.titulo, "destino": r.destino, "canal": r.canal,
                  "wamid": r.wamid, "estado": r.estado,
                  "error_msg": r.error_msg, "fecha": str(r.fecha)}
                 for r in rows
@@ -1331,13 +1401,15 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "getContactosWhatsapp":
             contactos = []
             for s in db.query(Supervisor).filter(Supervisor.telefono.isnot(None), Supervisor.telefono != "").all():
-                contactos.append({"nombre": s.nombre_sup or "", "numero": str(s.telefono).replace("+", "").replace(" ", ""), "tipo": "Supervisor"})
+                contactos.append({"nombre": s.nombre_sup or "", "numero": str(s.telefono).replace("+", "").replace(" ", ""), "email": s.email or "", "tipo": "Supervisor"})
             for p in db.query(Pastore).filter(Pastore.telefono.isnot(None), Pastore.telefono != "").all():
-                contactos.append({"nombre": p.nombre_pastor or "", "numero": str(p.telefono).replace("+", "").replace(" ", ""), "tipo": "Pastor"})
+                contactos.append({"nombre": p.nombre_pastor or "", "numero": str(p.telefono).replace("+", "").replace(" ", ""), "email": p.email or "", "tipo": "Pastor"})
             for a in db.query(AyudaPastor).filter(AyudaPastor.telefono.isnot(None), AyudaPastor.telefono != "").all():
-                contactos.append({"nombre": a.nombre_ayuda or "", "numero": str(a.telefono).replace("+", "").replace(" ", ""), "tipo": "Ayuda Pastor"})
+                contactos.append({"nombre": a.nombre_ayuda or "", "numero": str(a.telefono).replace("+", "").replace(" ", ""), "email": a.email or "", "tipo": "Ayuda Pastor"})
             for c in db.query(Contacto).filter(Contacto.telefono.isnot(None), Contacto.telefono != "").all():
-                contactos.append({"nombre": c.nombre or "", "numero": str(c.telefono).replace("+", "").replace(" ", ""), "tipo": "Contacto"})
+                contactos.append({"nombre": c.nombre or "", "numero": str(c.telefono).replace("+", "").replace(" ", ""), "email": c.email or "", "tipo": "Contacto"})
+            for c in db.query(Contacto).filter((Contacto.email.isnot(None)) & (Contacto.email != "") & ((Contacto.telefono.is_(None)) | (Contacto.telefono == ""))).all():
+                contactos.append({"nombre": c.nombre or "", "numero": "", "email": c.email or "", "tipo": "Contacto"})
             return {"ok": True, "data": contactos}
 
         # ── ESTADOS DE ENTREGA WHATSAPP (webhook) ──
