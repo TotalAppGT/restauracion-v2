@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Reporte Digital — Iglesia Restauración</title>
+<style>
+.script-application-banner,[class*="gwt-"][class*="banner"],body>div[style*="position: fixed"][style*="top: 0"],body>div[style*="position:fixed"][style*="top:0"]{display:none!important;height:0!important;}
+</style>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --pr:#1a3a5c; --pr2:#2563a8; --ok:#1e7e34; --er:#c0392b;
+  --wa:#d68910; --bg:#f0f4f8; --wh:#fff; --brd:#d0d8e8;
+  --tx:#1a1a2e; --tx2:#5a6a7a; --tx3:#99aabc; --shd:0 4px 20px rgba(26,58,92,.13);
+}
+body{background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;color:var(--tx);min-height:100dvh;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.wrap{max-width:560px;margin:0 auto;padding:0 0 40px}
+
+/* HEADER */
+.hdr{background:linear-gradient(135deg,var(--pr) 0%,var(--pr2) 100%);color:#fff;padding:20px 18px 18px;text-align:center;position:sticky;top:0;z-index:50}
+.hdr-logo{width:52px;height:52px;border-radius:50%;object-fit:cover;border:2.5px solid rgba(255,255,255,.4);margin:0 auto 10px;display:block;background:rgba(255,255,255,.1)}
+.hdr-ico{width:52px;height:52px;background:rgba(255,255,255,.15);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 10px}
+.hdr h1{font-size:17px;font-weight:900;letter-spacing:-.3px;margin-bottom:2px}
+.hdr p{font-size:12px;opacity:.8}
+.hdr-badge{display:inline-block;background:rgba(255,255,255,.2);border:1px solid rgba(255,255,255,.35);border-radius:99px;padding:3px 12px;font-size:11px;font-weight:700;margin-top:8px}
+
+/* CARD */
+.card{background:var(--wh);margin:14px 12px 0;border-radius:14px;box-shadow:var(--shd);overflow:hidden}
+.card-hdr{padding:13px 16px;border-bottom:1px solid var(--brd);display:flex;align-items:center;gap:9px;font-size:13px;font-weight:800;color:var(--pr);background:#f7fafd}
+.card-hdr span{font-size:19px}
+.card-body{padding:16px}
+
+/* FIELDS */
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.fg:last-child{margin-bottom:0}
+label{font-size:12px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.4px}
+.req{color:var(--er)}
+input,select,textarea{width:100%;padding:12px 14px;border:1.5px solid var(--brd);border-radius:10px;font-size:15px;color:var(--tx);background:var(--wh);-webkit-appearance:none;transition:border .15s,box-shadow .15s;font-family:inherit}
+input:focus,select:focus,textarea:focus{border-color:var(--pr2);box-shadow:0 0 0 3px rgba(37,99,168,.12);outline:none}
+input:read-only{background:#f3f6fa;color:var(--tx2);cursor:not-allowed}
+textarea{resize:none;line-height:1.5}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+
+/* LIDER STATUS */
+.lider-box{background:#f0f8f0;border:1.5px solid #27ae60;border-radius:10px;padding:12px 14px;display:none}
+.lider-box .ln{font-size:15px;font-weight:900;color:var(--ok);margin-bottom:3px}
+.lider-box .ld{font-size:12px;color:var(--tx2)}
+.lider-nf{background:#fff5f5;border:1.5px solid var(--er);border-radius:10px;padding:10px 14px;display:none;font-size:12px;color:var(--er);font-weight:700}
+
+/* TOTALES */
+.auto-calc{background:linear-gradient(135deg,#f0f4ff 0%,#e8f0fa 100%);border:1.5px solid var(--pr2);border-radius:10px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between}
+.auto-calc .lbl{font-size:11px;font-weight:800;color:var(--pr2);text-transform:uppercase;letter-spacing:.4px}
+.auto-calc .val{font-size:26px;font-weight:900;color:var(--pr)}
+.auto-calc-ok{background:linear-gradient(135deg,#f0fff4 0%,#e8faf0 100%);border-color:var(--ok)}
+.auto-calc-ok .lbl{color:var(--ok)}
+.auto-calc-ok .val{color:var(--ok)}
+
+/* SEG */
+.seg-item{background:#f7fafc;border:1.5px solid var(--brd);border-radius:10px;padding:13px;margin-bottom:10px;position:relative}
+.seg-num{position:absolute;top:10px;right:12px;background:var(--pr);color:#fff;border-radius:99px;font-size:10px;font-weight:800;padding:2px 8px}
+.seg-remove{position:absolute;top:8px;right:10px;background:#ffeaea;border:none;color:var(--er);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;font-weight:700}
+
+/* BTN ADD SEG */
+.btn-add{width:calc(100% - 32px);margin:0 16px;display:block;padding:12px;border:2px dashed var(--brd);border-radius:10px;background:transparent;color:var(--pr2);font-size:13px;font-weight:700;cursor:pointer;text-align:center;transition:.15s}
+.btn-add:active{background:#f0f4ff}
+
+/* SUBMIT */
+.submit-area{margin:16px 12px 0;background:var(--wh);border-radius:14px;box-shadow:var(--shd);padding:16px}
+.btn-submit{width:100%;padding:16px;background:linear-gradient(135deg,var(--pr) 0%,var(--pr2) 100%);color:#fff;border:none;border-radius:12px;font-size:16px;font-weight:900;letter-spacing:.3px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;transition:.15s;min-height:54px}
+.btn-submit:active{transform:scale(.98);opacity:.9}
+.btn-submit:disabled{opacity:.6;pointer-events:none}
+.btn-submit .spinner{width:20px;height:20px;border:2.5px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* PANTALLA ÉXITO — PENDIENTE */
+#success{display:none;padding:0 0 40px}
+.success-hdr{background:linear-gradient(135deg,#d68910 0%,#b7770d 100%);color:#fff;padding:28px 20px 24px;text-align:center}
+.success-ico{font-size:56px;display:block;margin-bottom:12px}
+.success-hdr h2{font-size:22px;font-weight:900;margin-bottom:6px}
+.success-hdr p{font-size:14px;opacity:.9}
+.alert-box{background:#fff;margin:14px 12px 0;border-radius:14px;box-shadow:var(--shd);overflow:hidden}
+.alert-box-hdr{background:#fff3cd;border-bottom:2px solid #ffc107;padding:13px 16px;display:flex;align-items:center;gap:10px}
+.alert-box-hdr .ico{font-size:22px}
+.alert-box-hdr .ttl{font-size:14px;font-weight:900;color:#856404}
+.alert-box-body{padding:16px}
+.alert-box-body p{font-size:13px;color:#5a6a7a;line-height:1.6}
+.alert-box-body .badge-pend{display:inline-block;background:#fff3cd;border:1.5px solid #ffc107;color:#856404;border-radius:99px;padding:4px 14px;font-size:12px;font-weight:800;margin:6px 0}
+.resumen-box{background:#fff;margin:10px 12px 0;border-radius:14px;box-shadow:var(--shd);overflow:hidden}
+.resumen-box-hdr{background:#f0f4ff;border-bottom:1px solid var(--brd);padding:11px 16px;font-size:13px;font-weight:800;color:var(--pr);display:flex;align-items:center;gap:8px}
+.resumen-grid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--brd)}
+.resumen-item{background:#fff;padding:11px 14px}
+.resumen-item .r-lbl{font-size:10px;font-weight:700;color:var(--tx2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.resumen-item .r-val{font-size:15px;font-weight:900;color:var(--tx)}
+.btn-reload{width:calc(100% - 24px);margin:14px 12px 0;display:block;padding:15px;background:linear-gradient(135deg,var(--pr) 0%,var(--pr2) 100%);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:800;cursor:pointer;text-align:center}
+
+/* RESPONSIVE */
+@media(max-width:380px){
+  .row2{grid-template-columns:1fr}
+  .row3{grid-template-columns:1fr 1fr}
+  .auto-calc .val{font-size:22px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER -->
+  <div class="hdr" id="mainHdr">
+    <div id="logoWrap" style="width:56px;height:56px;border-radius:50%;overflow:hidden;border:2.5px solid rgba(255,255,255,.4);margin:0 auto 10px;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;font-size:22px">⛪</div>
+    <h1 id="hdrTitle">Cargando...</h1>
+    <p>Formulario de Reporte de Grupo Familiar</p>
+    <div class="hdr-badge">📱 Formulario Digital</div>
+    <div style="margin-top:12px;opacity:.85;border-top:1px solid rgba(255,255,255,.15);padding-top:10px;display:flex;align-items:center;justify-content:center;gap:10px">
+      <img src="/totalapp-logo.jpg" alt="Total App GT" style="width:28px;height:28px;border-radius:6px;object-fit:cover;box-shadow:0 2px 6px rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1)">
+      <div style="text-align:left">
+        <div style="font-size:13px;font-weight:900;color:rgba(255,255,255,.95);line-height:1.2">Daniel Martínez</div>
+        <div style="font-size:9px;font-weight:700;color:rgba(255,255,255,.5);letter-spacing:.3px">Total App GT</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FORMULARIO -->
+  <form id="frm" onsubmit="enviar(event)" autocomplete="off">
+
+    <!-- CÓDIGO LÍDER -->
+    <div class="card">
+      <div class="card-hdr"><span>🔍</span> Identificación del Líder</div>
+      <div class="card-body">
+        <div class="fg">
+          <label>Buscar por código o nombre del líder <span class="req">*</span></label>
+          <div style="position:relative">
+            <input type="text" id="codigo" name="codigo" placeholder="Código o nombre" oninput="onCodigoInput()" autocomplete="off" required>
+            <div id="codigoSugerencias" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:2px solid var(--pr2);border-radius:0 0 10px 10px;max-height:220px;overflow-y:auto;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,.15)"></div>
+          </div>
+        </div>
+        <button type="button" class="btn-submit" style="padding:12px;font-size:14px;margin-top:4px" onclick="buscarLider()">🔍 Buscar Líder</button>
+        <div class="lider-box" id="liderInfo" style="margin-top:12px">
+          <div class="ln" id="lNom"></div>
+          <div class="ld" id="lDet"></div>
+        </div>
+        <div class="lider-nf" id="liderNotFound" style="margin-top:10px">⚠ Código no encontrado. Verifica e intenta de nuevo.</div>
+      </div>
+    </div>
+
+    <!-- REUNIÓN -->
+    <div class="card">
+      <div class="card-hdr"><span>📅</span> Datos de la Reunión</div>
+      <div class="card-body">
+        <div class="fg">
+          <label>Fecha <span class="req">*</span></label>
+          <input type="date" id="fecha" name="fecha" required>
+        </div>
+        <div class="row2">
+          <div class="fg">
+            <label>Hora Inicio</label>
+            <input type="time" id="horaInicio" name="horaInicio" value="19:00">
+          </div>
+          <div class="fg">
+            <label>Hora Final</label>
+            <input type="time" id="horaFinal" name="horaFinal" value="20:30">
+          </div>
+        </div>
+        <div class="fg">
+          <label>Tipo de Reunión</label>
+          <select id="tipoReunion" name="tipoReunion">
+            <option selected>Mixta (Reunión Regular)</option>
+            <option>Niños</option>
+            <option>Jóvenes</option>
+            <option>Mujeres</option>
+            <option>Profesionales</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- ASISTENCIA -->
+    <div class="card">
+      <div class="card-hdr"><span>👥</span> Asistencia al Grupo Familiar</div>
+      <div class="card-body">
+        <div class="row3">
+          <div class="fg">
+            <label>Hermanos</label>
+            <input type="number" id="hermanos" name="hermanos" value="" min="0" oninput="calcAsist()">
+          </div>
+          <div class="fg">
+            <label>Amigos</label>
+            <input type="number" id="amigos" name="amigos" value="" min="0" oninput="calcAsist()">
+          </div>
+          <div class="fg">
+            <label>Niños</label>
+            <input type="number" id="ninos" name="ninos" value="" min="0" oninput="calcAsist()">
+          </div>
+        </div>
+        <div class="auto-calc" style="margin-top:8px">
+          <div><div class="lbl">⟳ Total Asistencia GF (auto)</div><div style="font-size:11px;color:var(--tx2);margin-top:2px">Hnos + Amigos + Niños</div></div>
+          <div class="val" id="totalAsist">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CULTOS -->
+    <div class="card">
+      <div class="card-hdr"><span>⛪</span> Asistencia a culto en la iglesia</div>
+      <div class="card-body">
+        <div class="row2">
+          <div class="fg">
+            <label>Martes</label>
+            <input type="number" id="martes" name="martes" value="" min="0" oninput="calcCultos()">
+          </div>
+          <div class="fg">
+            <label>Jueves</label>
+            <input type="number" id="jueves" name="jueves" value="" min="0" oninput="calcCultos()">
+          </div>
+          <div class="fg">
+            <label>Domingo</label>
+            <input type="number" id="domingo" name="domingo" value="" min="0" oninput="calcCultos()">
+          </div>
+          <div class="fg">
+            <label>Otros</label>
+            <input type="number" id="otros" name="otros" value="" min="0" oninput="calcCultos()">
+          </div>
+        </div>
+        <div class="auto-calc auto-calc-ok" style="margin-top:8px">
+          <div><div class="lbl">⟳ Total Cultos (auto)</div><div style="font-size:11px;color:var(--ok);margin-top:2px">Mar + Jue + Dom + Otros</div></div>
+          <div class="val" id="totalCultos">0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OFRENDAS -->
+    <div class="card">
+      <div class="card-hdr"><span>💰</span> Ofrendas del Grupo</div>
+      <div class="card-body">
+        <div class="row2">
+          <div class="fg">
+            <label>Ofrenda Iglesia (Q)</label>
+            <input type="number" id="ofrendaIglesia" name="ofrendaIglesia" value="" min="0" step="0.01" inputmode="decimal" oninput="calcOf()">
+          </div>
+          <div class="fg">
+            <label>Ofrenda Bus (Q)</label>
+            <input type="number" id="ofrendaBus" name="ofrendaBus" value="" min="0" step="0.01" inputmode="decimal" oninput="calcOf()">
+          </div>
+        </div>
+        <div class="auto-calc" style="margin-top:8px;border-color:#e8a020;background:linear-gradient(135deg,#fffbf0,#fff8e8)">
+          <div><div class="lbl" style="color:#b7770d">⟳ Total Ofrendas Q (auto)</div></div>
+          <div class="val" style="color:#b7770d" id="totalOf">Q 0.00</div>
+        </div>
+        <!-- AVISO PENDIENTE -->
+        <div style="margin-top:12px;background:#fff3cd;border:1.5px solid #ffc107;border-radius:10px;padding:11px 13px;display:flex;gap:9px;align-items:flex-start">
+          <span style="font-size:18px;flex-shrink:0">⏳</span>
+          <div>
+            <div style="font-size:12px;font-weight:800;color:#856404">Ofrenda física pendiente</div>
+            <div style="font-size:11px;color:#856404;margin-top:2px;line-height:1.5">El monto se registra, pero quedará marcado como <b>"Pendiente"</b> en el sistema hasta que el encargado confirme la entrega física.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SEGUIMIENTOS -->
+    <div class="card">
+      <div class="card-hdr"><span>🤝</span> Seguimientos (opcional)</div>
+      <div class="card-body" id="segContainer">
+        <div class="seg-item" id="seg_1">
+          <div class="seg-num">1</div>
+          <div class="fg" style="margin-bottom:10px"><label>Nombre</label><input type="text" id="nombre1" name="nombre1" placeholder="Nombre de la persona"></div>
+          <div class="fg"><label>Tipo</label>
+            <select id="tipo1" name="tipo1">
+              <option value="">— Tipo de seguimiento —</option>
+              <option>Convertido</option><option>Reconciliación</option><option>Visita Programada</option>
+              <option>Bautizo en Agua</option><option>Sanidad</option><option>Oración</option><option>Otro</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <button type="button" class="btn-add" id="btnMore" onclick="addSeg()">+ Agregar otra persona</button>
+
+    <!-- SUBMIT -->
+    <div class="submit-area">
+      <button type="submit" class="btn-submit" id="btnEnviar">
+        <div class="spinner" id="spinner"></div>
+        <span id="btnTxt">📤 ENVIAR REPORTE</span>
+      </button>
+      <p style="text-align:center;font-size:11px;color:var(--tx3);margin-top:10px">Al enviar, el reporte queda registrado y la ofrenda marcada como <b>Pendiente</b> hasta confirmar entrega.</p>
+    <div style="text-align:center;padding:10px 0 4px;border-top:1px solid var(--brd);margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;opacity:.8">
+      <img src="/totalapp-logo.jpg" alt="Total App GT" style="width:24px;height:24px;border-radius:6px;object-fit:cover;box-shadow:0 2px 6px rgba(0,0,0,.15);border:1px solid rgba(0,0,0,.06)">
+      <div style="text-align:left">
+        <div style="font-size:13px;font-weight:900;color:var(--pr);line-height:1.2">Daniel Martínez</div>
+        <div style="font-size:9px;font-weight:800;color:var(--tx3);letter-spacing:.3px">Total App GT</div>
+      </div>
+    </div>
+    </div>
+
+  </form>
+
+  <!-- PANTALLA ÉXITO — ALERTA PENDIENTE -->
+  <div id="success">
+    <!-- Header naranja/alerta -->
+    <div class="success-hdr">
+      <span class="success-ico">⏳</span>
+      <h2>¡Reporte Recibido!</h2>
+      <p>Tu reporte fue guardado en el sistema.</p>
+    </div>
+
+    <!-- Aviso principal pendiente -->
+    <div class="alert-box">
+      <div class="alert-box-hdr">
+        <span class="ico">⚠️</span>
+        <div class="ttl">Ofrenda pendiente de entrega física</div>
+      </div>
+      <div class="alert-box-body">
+        <p>Tu reporte está guardado, pero la ofrenda aparecerá como:</p>
+        <div style="text-align:center;padding:8px 0"><span class="badge-pend">⚠ PENDIENTE</span></div>
+        <p>El encargado del sistema buscará tu reporte por código cuando le entregues la ofrenda físicamente, y actualizará el estado a <b style="color:var(--ok)">✓ Recibida</b>.</p>
+        <p style="margin-top:10px;font-size:12px;color:var(--tx3)">Asegúrate de entregar la ofrenda al responsable asignado lo antes posible.</p>
+      </div>
+    </div>
+
+    <!-- Resumen del reporte enviado -->
+    <div class="resumen-box">
+      <div class="resumen-box-hdr">📋 Resumen del Reporte Enviado</div>
+      <div class="resumen-grid" id="resGrid"></div>
+    </div>
+
+    <button class="btn-reload" onclick="recargarFormulario()">📋 Enviar Otro Reporte</button>
+
+    <!-- FOOTER MARCA ÉXITO -->
+    <div style="text-align:center;padding:14px;margin-top:8px;opacity:.75">
+      <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+        <img src="/totalapp-logo.jpg" alt="Total App GT" style="width:22px;height:22px;border-radius:5px;object-fit:cover;box-shadow:0 2px 6px rgba(0,0,0,.12);border:1px solid rgba(0,0,0,.05)">
+        <div style="text-align:left">
+          <div style="font-size:12px;font-weight:900;color:var(--pr);line-height:1.2">Daniel Martínez</div>
+          <div style="font-size:8px;font-weight:700;color:var(--tx3);letter-spacing:.3px">Total App GT</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+// ── NOTIFICACIÓN PROFESIONAL (reemplaza alert() nativo) ──
+let _notifyTimer=null;
+function notify(msg,type,ms){
+  type=type||'wa';
+  ms=ms||4000;
+  var existing=document.getElementById('notifyOverlay');
+  if(existing)existing.remove();
+  if(_notifyTimer)clearTimeout(_notifyTimer);
+  var ov=document.createElement('div');
+  ov.id='notifyOverlay';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;';
+  var icons={ok:'fa-check-circle',er:'fa-times-circle',wa:'fa-exclamation-triangle',in:'fa-info-circle'};
+  var colors={ok:'#1e7e34',er:'#c0392b',wa:'#d68910',in:'#2563a8'};
+  var emojis={ok:'✅',er:'❌',wa:'⚠️',in:'ℹ️'};
+  ov.innerHTML='<div style="background:#fff;border-radius:18px;padding:28px 24px;max-width:360px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.25);text-align:center;animation:fadeIn .25s ease">'
+    +'<div style="font-size:48px;margin-bottom:12px">'+emojis[type]+'</div>'
+    +'<p style="font-size:15px;color:#333;line-height:1.6;font-weight:500">'+msg+'</p>'
+    +'<button onclick="this.closest(\'#notifyOverlay\').remove()" style="margin-top:16px;padding:10px 32px;border:none;border-radius:10px;font-size:14px;font-weight:700;background:'+colors[type]+';color:#fff;cursor:pointer">Entendido</button>'
+    +'</div>';
+  document.body.appendChild(ov);
+  _notifyTimer=setTimeout(function(){var el=document.getElementById('notifyOverlay');if(el)el.remove();},ms);
+}
+// Agregar animación
+var _animStyle=document.createElement('style');
+_animStyle.textContent='@keyframes fadeIn{from{opacity:0;transform:translateY(12px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}';
+document.head.appendChild(_animStyle);
+
+let segCount=1;
+let liderData=null;
+let _lastData={};
+let segIdx=1;
+const MAX_SEG=10;
+
+function call(action,payload,cb){
+  payload=payload||{};
+  fetch(window.location.origin+'/api/dispatch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:action,payload:payload,token:''})})
+    .then(function(r){return r.json();})
+    .then(function(r){if(cb)cb(null,r);})
+    .catch(function(e){if(cb)cb(e,null);});
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');}
+
+// Cargar logo y nombre desde config del sistema
+call('getConfig',{},function(err,cfg){
+  if(err||!cfg||!cfg.ok) return;
+  if(cfg.logoUrl){
+    const lw=document.getElementById('logoWrap');
+    if(lw) lw.innerHTML='<img src=\"'+cfg.logoUrl+'\" style=\"width:100%;height:100%;object-fit:cover\" alt=\"Logo\">';
+  }
+  if(cfg.nombre){
+    const ht=document.getElementById('hdrTitle');
+    if(ht) ht.textContent=cfg.nombre;
+  }
+});
+
+// Fecha hoy
+document.getElementById('fecha').value=new Date().toISOString().split('T')[0];
+
+function recargarFormulario(){
+  document.getElementById('frm').style.display='block';
+  document.getElementById('success').style.display='none';
+  document.querySelector('.hdr').style.background='linear-gradient(135deg,#1a3a5c 0%,#2563a8 100%)';
+  document.getElementById('liderInfo').style.display='none';
+  document.getElementById('liderNotFound').style.display='none';
+  document.getElementById('codigo').value='';
+  document.getElementById('fecha').value=new Date().toISOString().split('T')[0];
+  document.getElementById('horaInicio').value='';
+  document.getElementById('horaFinal').value='';
+  document.getElementById('hermanos').value='';
+  document.getElementById('amigos').value='';
+  document.getElementById('ninos').value='';
+  document.getElementById('totalAsist').textContent='0';
+  document.getElementById('martes').value='';
+  document.getElementById('jueves').value='';
+  document.getElementById('domingo').value='';
+  document.getElementById('otros').value='';
+  document.getElementById('totalCultos').textContent='0';
+  document.getElementById('ofrendaIglesia').value='';
+  document.getElementById('ofrendaBus').value='';
+  document.getElementById('totalOf').textContent='Q 0.00';
+  document.getElementById('nombre1').value='';document.getElementById('tipo1').value='';
+  document.getElementById('nombre2').value='';document.getElementById('tipo2').value='';
+  document.getElementById('nombre3').value='';document.getElementById('tipo3').value='';
+  // Remover seguimientos dinámicos extra (más allá de los 3 fijos)
+  for(let i=4;i<=segIdx;i++){const el=document.getElementById('seg_'+i);if(el)el.remove();}
+  segIdx=3;document.getElementById('btnMore').style.display='block';
+  // Resetear inputs dinámicas de seguimiento fijo 1-3
+  ['nombre1','tipo1','nombre2','tipo2','nombre3','tipo3'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  liderData=null;
+  document.getElementById('codigo').focus();
+}
+
+function onCodigoInput(){
+  document.getElementById('liderInfo').style.display='none';
+  document.getElementById('liderNotFound').style.display='none';
+  liderData=null;
+  var q=document.getElementById('codigo').value.trim();
+  if(q.length<2){document.getElementById('codigoSugerencias').style.display='none';return;}
+  clearTimeout(window._sugTimer);
+  window._sugTimer=setTimeout(function(){
+    call('buscarLideres',{query:q},function(err,res){
+      var sug=document.getElementById('codigoSugerencias');if(!sug)return;
+      var data=(res&&res.data)||(Array.isArray(res)?res:[]);
+      if(!data||!data.length){sug.style.display='none';return;}
+      sug.innerHTML=data.map(function(h){
+        return '<div class=sug-item onclick=seleccionarLider(''+esc(h.CodigoL||'')+'') style=padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee onmouseenter=this.style.background='#f0f4ff' onmouseleave=this.style.background='#fff'>'
+          +'<div style=font-weight:700;color:var(--pr);font-size:14px>'+esc(h.NombreL)+' <span style=font-family:monospace;font-size:12px;color:var(--pr2);margin-left:6px>'+esc(h.CodigoL)+'</span></div>'
+          +'<div style=font-size:11px;color:var(--tx3)>D'+esc(h.Distrito)+' Z'+esc(h.Zona)+' | '+esc(h['Pastor Zona']||'-')+'</div></div>';
+      }).join('');
+      sug.style.display='block';
+    });
+  },300);
+}
+function seleccionarLider(codigo){
+  document.getElementById('codigo').value=codigo;
+  document.getElementById('codigoSugerencias').style.display='none';
+  buscarLider();
+}
+function buscarLider(){
+  const query=document.getElementById('codigo').value.trim();
+  if(!query){notify('Ingresa un código o nombre','wa');return;}
+  const btn=document.querySelector('.card .btn-submit');btn.disabled=true;
+  document.getElementById('liderInfo').style.display='none';
+  document.getElementById('liderNotFound').style.display='none';
+  call('buscarLideres',{query:query},function(err,res){
+    btn.disabled=false;
+    var data=(res&&res.data)||(Array.isArray(res)?res:[]);
+    if(!data||!data.length){document.getElementById('liderNotFound').style.display='block';return;}
+    if(data.length===1){
+      liderData=data[0];
+      document.getElementById('codigo').value=data[0].CodigoL||'';
+      document.getElementById('lNom').textContent='✓ '+data[0].NombreL+' ('+data[0].CodigoL+')';
+      document.getElementById('lDet').textContent='Sector: '+(data[0]['Sup SectorL']||'-')+' · Área: '+(data[0]['Sup AreaL']||'-')+' · Pastor Zona: '+(data[0]['Pastor Zona']||'-');
+      document.getElementById('liderInfo').style.display='block';
+    }else{
+      var sug=document.getElementById('codigoSugerencias');if(!sug)return;
+      sug.innerHTML=data.map(function(h){
+        return '<div class=sug-item onclick=seleccionarLider(''+esc(h.CodigoL||'')+'') style=padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee onmouseenter=this.style.background='#f0f4ff' onmouseleave=this.style.background='#fff'>'
+          +'<div style=font-weight:700;color:var(--pr);font-size:14px>'+esc(h.NombreL)+' <span style=font-family:monospace;font-size:12px;color:var(--pr2);margin-left:6px>'+esc(h.CodigoL)+'</span></div>'
+          +'<div style=font-size:11px;color:var(--tx3)>D'+esc(h.Distrito)+' Z'+esc(h.Zona)+' | '+esc(h['Pastor Zona']||'-')+'</div></div>';
+      }).join('');
+      sug.innerHTML+='<div style=text-align:center;padding:8px;font-size:11px;color:var(--tx3);cursor:pointer;background:#fafbfc onclick=document.getElementById('codigoSugerencias').style.display='none'>'+data.length+' resultados — Cerrar</div>';
+      sug.style.display='block';
+    }
+  });
+}
+document.addEventListener('click',function(e){
+  var sug=document.getElementById('codigoSugerencias');var inp=document.getElementById('codigo');
+  if(sug&&inp&&e.target!==inp&&!sug.contains(e.target))sug.style.display='none';
+});
+
+
+function num(id){return parseInt(document.getElementById(id).value)||0;}
+function calcAsist(){document.getElementById('totalAsist').textContent=num('hermanos')+num('amigos')+num('ninos');}
+function calcCultos(){document.getElementById('totalCultos').textContent=num('martes')+num('jueves')+num('domingo')+num('otros');}
+function calcOf(){
+  const t=(parseFloat(document.getElementById('ofrendaIglesia').value)||0)+(parseFloat(document.getElementById('ofrendaBus').value)||0);
+  document.getElementById('totalOf').textContent='Q '+t.toFixed(2);
+}
+
+function addSeg(){
+  if(segIdx>=MAX_SEG){document.getElementById('btnMore').style.display='none';return;}
+  segIdx++;
+  const d=document.createElement('div');
+  d.className='seg-item';d.id='seg_'+segIdx;
+  const types=['Convertido','Reconciliación','Visita Programada','Bautizo en Agua','Sanidad','Oración','Otro'];
+  d.innerHTML=`<button type="button" class="seg-remove" onclick="removeSeg(${segIdx})">✕ Quitar</button>
+  <div class="fg" style="margin-bottom:10px"><label>Nombre</label><input type="text" id="nombre${segIdx}" name="nombre${segIdx}" placeholder="Nombre de la persona"></div>
+  <div class="fg"><label>Tipo</label><select id="tipo${segIdx}" name="tipo${segIdx}"><option value="">— Tipo —</option>${types.map(t=>`<option>${t}</option>`).join('')}</select></div>`;
+  document.getElementById('segContainer').appendChild(d);
+  if(segIdx>=MAX_SEG)document.getElementById('btnMore').style.display='none';
+}
+function removeSeg(i){const d=document.getElementById('seg_'+i);if(d)d.remove();segIdx--;document.getElementById('btnMore').style.display='block';}
+
+function g(id){const el=document.getElementById(id);return el?el.value:'';}
+
+function enviar(e){
+  e.preventDefault();
+  if(!liderData){notify('Primero busca y confirma el código del líder.','wa');document.getElementById('codigo').focus();return;}
+  const cod=g('codigo').trim();
+  if(!cod){notify('Ingresa el código del líder','wa');return;}
+  const btn=document.getElementById('btnEnviar');
+  const spinner=document.getElementById('spinner');
+  const btnTxt=document.getElementById('btnTxt');
+  btn.disabled=true;spinner.style.display='block';btnTxt.textContent='Enviando...';
+
+  _lastData={
+    codigo:cod,fecha:g('fecha'),horaInicio:g('horaInicio'),horaFinal:g('horaFinal'),tipoReunion:g('tipoReunion'),
+    hermanos:g('hermanos'),amigos:g('amigos'),ninos:g('ninos'),
+    martes:g('martes'),jueves:g('jueves'),domingo:g('domingo'),otros:g('otros'),
+    ofrendaIglesia:g('ofrendaIglesia'),ofrendaBus:g('ofrendaBus'),
+    nombre1:g('nombre1'),tipo1:g('tipo1'),
+    nombre2:g('nombre2')||'',tipo2:g('tipo2')||'',
+    nombre3:g('nombre3')||'',tipo3:g('tipo3')||'',
+  };
+
+  // Recolectar seguimientos dinámicamente (hasta 10)
+  _lastData.nombre2=document.getElementById('nombre2')?.value||'';
+  _lastData.tipo2=document.getElementById('tipo2')?.value||'';
+  _lastData.nombre3=document.getElementById('nombre3')?.value||'';
+  _lastData.tipo3=document.getElementById('tipo3')?.value||'';
+  _lastData.nombre4=document.getElementById('nombre4')?.value||'';
+  _lastData.tipo4=document.getElementById('tipo4')?.value||'';
+  _lastData.nombre5=document.getElementById('nombre5')?.value||'';
+  _lastData.tipo5=document.getElementById('tipo5')?.value||'';
+  _lastData.nombre6=document.getElementById('nombre6')?.value||'';
+  _lastData.tipo6=document.getElementById('tipo6')?.value||'';
+  _lastData.nombre7=document.getElementById('nombre7')?.value||'';
+  _lastData.tipo7=document.getElementById('tipo7')?.value||'';
+  _lastData.nombre8=document.getElementById('nombre8')?.value||'';
+  _lastData.tipo8=document.getElementById('tipo8')?.value||'';
+  _lastData.nombre9=document.getElementById('nombre9')?.value||'';
+  _lastData.tipo9=document.getElementById('tipo9')?.value||'';
+  _lastData.nombre10=document.getElementById('nombre10')?.value||'';
+  _lastData.tipo10=document.getElementById('tipo10')?.value||'';
+
+  call('registrarReporteDigital',_lastData,function(err,res){
+    btn.disabled=false;spinner.style.display='none';btnTxt.textContent='📤 ENVIAR REPORTE';
+    if(err){notify('Error de conexión: '+err.message,'er');return;}
+    if(res&&res.ok){
+      document.getElementById('frm').style.display='none';
+      document.querySelector('.hdr').style.background='linear-gradient(135deg,#8b6914 0%,#d68910 100%)';
+      mostrarExito();
+    } else {
+      notify('Error al enviar: '+(res&&res.msg||'Error desconocido'),'er');
+    }
+  });
+}
+
+function mostrarExito(){
+  document.getElementById('success').style.display='block';
+  const agf=(parseInt(_lastData.hermanos)||0)+(parseInt(_lastData.amigos)||0)+(parseInt(_lastData.ninos)||0);
+  const cultos=(parseInt(_lastData.martes)||0)+(parseInt(_lastData.jueves)||0)+(parseInt(_lastData.domingo)||0)+(parseInt(_lastData.otros)||0);
+  const ofTot=(parseFloat(_lastData.ofrendaIglesia)||0)+(parseFloat(_lastData.ofrendaBus)||0);
+  const segs=[_lastData.nombre1,_lastData.nombre2,_lastData.nombre3,_lastData.nombre4,_lastData.nombre5,_lastData.nombre6,_lastData.nombre7,_lastData.nombre8,_lastData.nombre9,_lastData.nombre10].filter(Boolean).length;
+  const fmtFecha=(s)=>{if(!s)return'—';const p=s.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:s;};
+  const items=[
+    {l:'Código',v:_lastData.codigo},
+    {l:'Líder',v:liderData?.['NombreL']||'—'},
+    {l:'Fecha',v:fmtFecha(_lastData.fecha)},
+    {l:'Hora',v:(_lastData.horaInicio||'')+'—'+(_lastData.horaFinal||'')},
+    {l:'Asistencia GF',v:agf},
+    {l:'Total Cultos',v:cultos},
+    {l:'Ofr. Iglesia',v:'Q '+parseFloat(_lastData.ofrendaIglesia||0).toFixed(2)},
+    {l:'Ofr. Bus',v:'Q '+parseFloat(_lastData.ofrendaBus||0).toFixed(2)},
+    {l:'Ofrenda Total',v:'Q '+ofTot.toFixed(2)},
+    {l:'Seguimientos',v:segs},
+    {l:'Estado Ofrenda',v:'⏳ Pendiente'},
+  ];
+  const rg=document.getElementById('resGrid');
+  if(rg)rg.innerHTML=items.map(i=>`<div class="resumen-item"><div class="r-lbl">${i.l}</div><div class="r-val" style="${i.l==='Estado Ofrenda'?'color:#856404':''}">${i.v}</div></div>`).join('');
+  document.getElementById('success').scrollIntoView({behavior:'smooth'});
+}
+</script>
+</body>
+</html>
