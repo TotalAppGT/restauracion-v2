@@ -294,7 +294,7 @@ def _procesar_notificaciones_pendientes():
                         if not num or len(num) < 8:
                             continue
                         try:
-                            resp = send_whatsapp_template(num, params=[msg_wa])
+                            resp = send_whatsapp_template(num, params=["Iglesia Restauracion", msg_wa])
                             log_estado = "enviado" if resp.get("ok") else "fallo"
                             log_wamid = resp.get("wamid", "")
                             log_error = str(resp.get("msg", ""))[:300]

@@ -1194,7 +1194,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 result = send_whatsapp_bulk(nums, msg) if len(nums) > 1 else send_whatsapp(nums[0], msg)
             else:
                 texto_wa = _formatear_whatsapp(msg)
-                results = [send_whatsapp_template(n, params=[texto_wa]) for n in nums]
+                results = [send_whatsapp_template(n, params=["Iglesia Restauracion", texto_wa]) for n in nums]
                 ok_count = sum(1 for r in results if r.get("ok"))
                 result = {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(nums)} contactos"}
             return result
@@ -1211,7 +1211,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if forzar_texto:
                 return send_whatsapp_bulk(numbers, msg, pdf_url if pdf_url else None)
             texto_wa = _formatear_whatsapp(msg, pdf_url)
-            results = [send_whatsapp_template(n, params=[texto_wa]) for n in numbers]
+            results = [send_whatsapp_template(n, params=["Iglesia Restauracion", texto_wa]) for n in numbers]
             ok_count = sum(1 for r in results if r.get("ok"))
             return {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(numbers)} contactos"}
 
@@ -1307,7 +1307,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 return {"ok": False, "msg": "Numero y mensaje requeridos"}
             fecha = dt.now().strftime("%d/%m/%Y")
             msg_wa = f"\U0001f4e2 {titulo + ' - ' if titulo else ''}{mensaje}  \U0001f4c5 {fecha}"
-            resp = send_whatsapp_template(numero, params=[msg_wa])
+            resp = send_whatsapp_template(numero, params=["Iglesia Restauracion", msg_wa])
             db.add(NotificacionLog(
                 notificacion_id=0, titulo=titulo, destino=numero,
                 wamid=resp.get("wamid", ""),
