@@ -1,2 +1,1 @@
 fpdf2==2.7.9
-weasyprint==69.0
