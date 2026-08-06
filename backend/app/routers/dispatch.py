@@ -799,62 +799,83 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     count = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie.like(f'%cuadre_{today_str}%')).count() + 1
                     no_serie = f"cuadre_{today_str}_{count:03d}"
                     fecha_gen = dt2.now().strftime('%d/%m/%Y %I:%M %p')
-                    pdf = FPDF('P','mm','Letter'); pdf.set_auto_page_break(True,14)
-                    pdf.add_page(); pdf.set_margin(14)
-                    w=pdf.w-28; cx=14
-                    # Header
-                    pdf.set_fill_color(26,58,92); pdf.rect(0,0,pdf.w,26,'F')
-                    pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',16)
-                    pdf.set_xy(cx,6); pdf.cell(w,8,pdf_safe(sys_nom or'REDIL')[:40],0,0,'L')
-                    pdf.set_font('Helvetica','',8); pdf.set_text_color(200,215,240)
-                    pdf.set_xy(cx,15); pdf.cell(w*0.7,5,f'Cuadre Dominical - {fecha or "Hoy"} - Generado {fecha_gen}',0,0,'L')
+                    pct = round(entregaron/total_lideres*100,1) if total_lideres else 0
+                    # IDENTICO al diseno del generador de reportes
+                    pdf = FPDF('L','mm','Letter'); pdf.set_auto_page_break(True,12)
+                    pdf.add_page(); pdf.set_margin(12)
+                    w=pdf.w-24; cx=12
+                    # Header azul full-width
+                    pdf.set_fill_color(26,58,92); pdf.rect(0,0,pdf.w,28,'F')
+                    pdf.set_draw_color(59,130,200); pdf.set_line_width(1.5)
+                    pdf.line(0,28,pdf.w,28)
+                    pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',18)
+                    pdf.set_xy(cx,6); pdf.cell(w*0.65,8,pdf_safe(sys_nom or'REDIL')[:40],0,0,'L')
+                    pdf.set_font('Helvetica','',9); pdf.set_text_color(200,215,240)
+                    pdf.set_xy(cx,16); pdf.cell(w*0.65,5,f'Cuadre Dominical  -  {fecha or "Hoy"}  -  {fecha_gen}',0,0,'L')
                     pdf.set_fill_color(255,255,255); pdf.set_text_color(26,58,92)
-                    pdf.set_font('Helvetica','B',11); pdf.set_xy(pdf.w-58,5)
-                    pdf.cell(44,10,no_serie,0,0,'C',True)
-                    pdf.set_font('Helvetica','',7); pdf.set_text_color(26,58,92)
-                    pdf.set_xy(pdf.w-58,15.5); pdf.cell(44,5,f'{total_lideres} lideres',0,0,'C')
-                    # Resumen KPIs
-                    pdf.set_y(32); kpi_data=[('Total Lideres',str(total_lideres)),('Entregaron',str(entregaron)),('Pendientes',str(pendientes_c)),('Ofrenda',f'Q{ofrenda_total:,.2f}')]
-                    kpi_w=w/4; kpi_h=16
-                    for i,(lbl,val) in enumerate(kpi_data):
-                        xs=cx+i*kpi_w; pdf.set_fill_color(245,247,252)
-                        pdf.rect(xs,32,kpi_w-3,kpi_h,'F')
-                        pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',12)
-                        pdf.set_xy(xs+3,33); pdf.cell(kpi_w-6,7,val,0,0,'L')
-                        pdf.set_font('Helvetica','',7); pdf.set_text_color(130,140,155)
-                        pdf.set_xy(xs+3,40); pdf.cell(kpi_w-6,5,lbl.upper(),0,0,'L')
-                    # Tabla por distrito
-                    yt=pdf.get_y()+kpi_h+6
-                    for dg in distritos_list:
-                        pdf.set_fill_color(37,99,168); pdf.set_text_color(255,255,255)
-                        pdf.set_font('Helvetica','B',10); pdf.set_xy(cx,yt)
-                        pdf.cell(w,7,f'Distrito {dg["distrito"]} - {dg["entregaron"]} entregaron, {dg["pendientes"]} pendientes - Q{dg["ofrendaTotal"]:,.2f}',0,0,'L',True)
-                        yt+=8
-                        for zg in dg.get("zonas",[]):
-                            pdf.set_fill_color(245,247,252); pdf.set_text_color(50,60,75)
-                            pdf.set_font('Helvetica','B',8); pdf.set_xy(cx+4,yt)
-                            pdf.cell(w-4,6,f'Zona {zg["zona"]} | {zg["entregaron"]}/{zg["totalLideres"]} entregaron | Q{zg["ofrendaTotal"]:,.2f}',0,0,'L')
-                            yt+=6
-                            for lid in zg.get("lideres",[]):
-                                if yt>250: pdf.add_page(); yt=14
-                                color = (5,150,105) if lid["tieneReporte"] else (200,40,40)
-                                estado_str = 'Entregado' if lid["tieneReporte"] else 'PENDIENTE'
-                                pdf.set_text_color(*color); pdf.set_font('Helvetica','',7)
-                                pdf.set_xy(cx+8,yt); pdf.cell(20,4.5,pdf_safe(lid.get("codigo","-"))[:10],0,0,'L')
-                                pdf.set_xy(cx+30,yt); pdf.cell(60,4.5,pdf_safe(lid.get("nombre","-"))[:35],0,0,'L')
-                                pdf.set_xy(cx+92,yt); pdf.cell(30,4.5,estado_str,0,0,'L')
-                                of_lid = lid.get("ofrendaTotal",0)
-                                pdf.set_xy(cx+124,yt); pdf.cell(30,4.5,f'Q{of_lid:,.2f}' if of_lid else '-',0,0,'L')
-                                yt+=4.5
-                            yt+=2
-                        yt+=3
-                    # Footer
-                    pdf.set_y(yt+4); pdf.set_draw_color(59,130,200); pdf.set_line_width(.6)
+                    pdf.set_font('Helvetica','B',13); pdf.set_xy(pdf.w-75,5)
+                    pdf.cell(63,10,no_serie,0,0,'C',True)
+                    pdf.set_font('Helvetica','',8); pdf.set_text_color(26,58,92)
+                    pdf.set_xy(pdf.w-75,15.5); pdf.cell(63,5,f'{total_lideres} lideres',0,0,'C')
+                    # KPI CARDS (2 rows of 4)
+                    colors=[(99,102,241),(16,185,129),(239,68,68),(249,115,22),(59,130,246),(139,92,246),(20,184,166),(245,158,11)]
+                    kpi_vals=[('Lideres',str(total_lideres)),('Entregaron',str(entregaron)),('Pendientes',str(pendientes_c)),('Ofrenda',f'Q{ofrenda_total:,.2f}'),('% Cumplimiento',f'{pct}%'),('Distritos',str(len(distritos_list))),('',''),('','')]
+                    card_w=(w-15)/4; card_h=19; gap=5; y0=33
+                    for i,(l,v) in enumerate(kpi_vals):
+                        x=cx+(i%4)*(card_w+gap/2); y=y0+(i//4)*(card_h+gap/2)
+                        if not l: continue
+                        pdf.set_fill_color(252,253,255); pdf.set_draw_color(230,235,245)
+                        pdf.rect(x,y,card_w,card_h,'DF')
+                        cr,cg,cb=colors[i]; pdf.set_fill_color(cr,cg,cb)
+                        pdf.rect(x,y,3,card_h,'F')
+                        pdf.set_text_color(cr,cg,cb); pdf.set_font('Helvetica','B',13)
+                        pdf.set_xy(x+6,y+2); pdf.cell(card_w-10,8,v,0,0,'L')
+                        pdf.set_font('Helvetica','',7.5); pdf.set_text_color(130,140,155)
+                        pdf.set_xy(x+6,y+11); pdf.cell(card_w-10,5,l.upper(),0,0,'L')
+                    # TABLE
+                    tbl_y=y0+2*card_h+2*gap+2
+                    cols=[('Codigo',18),('Lider',50),('D-Z',18),('Pastor Zona',42),('Sup.Sector',38),('Estado',24),('Ofrenda',28)]
+                    cw2=[c[1] for c in cols]; ch=[c[0] for c in cols]
+                    pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255)
+                    pdf.set_font('Helvetica','B',7.5); pdf.set_y(tbl_y); x=cx
+                    for i,cw_val in enumerate(cw2): pdf.set_xy(x,tbl_y); pdf.cell(cw_val,7,ch[i],0,0,'C',True); x+=cw_val
+                    y=tbl_y+7; rh=5.8; max_rows=int((195-y)/rh)
+                    for ri,lid in enumerate(data):
+                        if ri>0 and ri%max_rows==0:
+                            pdf.add_page(); y=12
+                            pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255)
+                            pdf.set_font('Helvetica','B',7.5); pdf.set_y(y); x=cx
+                            for i2,cw_val2 in enumerate(cw2): pdf.set_xy(x,y); pdf.cell(cw_val2,7,ch[i2],0,0,'C',True); x+=cw_val2
+                            y+=7
+                        pdf.set_fill_color(252,254,255) if ri%2==0 else pdf.set_fill_color(247,250,254)
+                        tiene=lid.get("tieneReporte",False); of_v=lid.get("ofrendaTotal",0)
+                        vals=[pdf_safe(lid.get("codigo","-"))[:8],pdf_safe(lid.get("nombre","-"))[:30],f'D{pdf_safe(lid.get("distrito","?"))} Z{pdf_safe(lid.get("zona","?"))}',pdf_safe(lid.get("pastorZona","-"))[:24],pdf_safe(lid.get("supSector","-"))[:22],'',f'Q{of_v:,.2f}' if of_v else '-']
+                        pdf.set_font('Helvetica','',7.5); x=cx
+                        for vi,cw_val3 in enumerate(cw2):
+                            pdf.set_xy(x,y); align='L'if vi<2 else'C'
+                            if vi==5:
+                                if not tiene:
+                                    pdf.set_text_color(200,40,40)
+                                    pdf.set_fill_color(254,242,242); pdf.set_draw_color(240,200,200)
+                                    pdf.set_xy(x,y); pdf.cell(cw_val3,rh,'','DF',0,'C',True)
+                                    pdf.set_xy(x,y); pdf.cell(cw_val3,rh,'Pendiente',0,0,'C')
+                                else:
+                                    pdf.set_text_color(5,150,105)
+                                    pdf.set_fill_color(236,253,245); pdf.set_draw_color(180,230,200)
+                                    pdf.set_xy(x,y); pdf.cell(cw_val3,rh,'','DF',0,'C',True)
+                                    pdf.set_xy(x,y); pdf.cell(cw_val3,rh,'Entregado',0,0,'C')
+                            else:
+                                pdf.set_xy(x,y); pdf.set_text_color(50,60,75)
+                                pdf.cell(cw_val3,rh,vals[vi],0,0,align,True)
+                            x+=cw_val3
+                        y+=rh
+                    # FOOTER
+                    pdf.set_y(y+4); pdf.set_draw_color(59,130,200); pdf.set_line_width(.6)
                     pdf.line(cx,pdf.get_y(),pdf.w-cx,pdf.get_y())
                     pdf.set_font('Helvetica','B',8); pdf.set_text_color(26,58,92)
-                    pdf.set_xy(cx,pdf.get_y()+2); pdf.cell(w*0.5,6,f'Total: {total_lideres} lideres - Q{ofrenda_total:,.2f}',0,0,'L')
+                    pdf.set_xy(cx,pdf.get_y()+2); pdf.cell(w*0.5,6,f'{total_lideres} lideres  -  Q{ofrenda_total:,.2f}',0,0,'L')
                     pdf.set_font('Helvetica','',7); pdf.set_text_color(140,150,165)
-                    pdf.set_xy(cx,pdf.get_y()+7); pdf.cell(w,5,'Daniel Martinez - Total App GT',0,0,'R')
+                    pdf.set_xy(cx,pdf.get_y()+7); pdf.cell(w,5,'Daniel Martinez  -  Total App GT',0,0,'R')
                     buf=io.BytesIO(); pdf.output(buf); pdf_b64=base64.b64encode(buf.getvalue()).decode()
                     gr = GeneradorReporte(
                         no_serie=no_serie, fecha_inicio=fecha or None, fecha_fin=fecha or None,
