@@ -1,2 +1,0 @@
-[phases.setup]
-aptPackages = ["wkhtmltopdf", "fontconfig", "fonts-dejavu-core"]

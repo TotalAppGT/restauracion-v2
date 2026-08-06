@@ -790,7 +790,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "ofrendaTotal": round(ofrenda_total, 2)}
             if generar_pdf:
                 try:
-                    import pdfkit, base64
+                    from fpdf import FPDF
                     from datetime import datetime as dt2
                     sys_nom = ""
                     try:
@@ -801,49 +801,70 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     count = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie.like(f'%cuadre_{today_str}%')).count() + 1
                     no_serie = f"cuadre_{today_str}_{count:03d}"
                     fecha_gen = dt2.now().strftime('%d/%m/%Y %I:%M %p')
-                    pct = round(entregaron/total_lideres*100,1) if total_lideres else 0
-                    # Construir filas HTML por distrito/zona
-                    rows_cuadre = ""
-                    for dg in distritos_list:
-                        rows_cuadre += f'<tr class="dist-row"><td colspan="8"><b>Distrito {dg["distrito"]}</b> — {dg["entregaron"]}/{dg["totalLideres"]} entregaron, {dg["pendientes"]} pendientes — Q{dg["ofrendaTotal"]:,.2f}</td></tr>'
-                        for zg in dg.get("zonas",[]):
-                            rows_cuadre += f'<tr class="zona-row"><td></td><td colspan="7">Zona {zg["zona"]} | {zg["entregaron"]}/{zg["totalLideres"]} entregaron | Q{zg["ofrendaTotal"]:,.2f}</td></tr>'
-                            for lid in zg.get("lideres",[]):
-                                tiene = lid.get("tieneReporte",False)
-                                of_lid = lid.get("ofrendaTotal",0)
-                                estado = 'Entregado' if tiene else 'Pendiente'
-                                row_style = '' if tiene else 'style="background:#fff5f5"'
-                                rows_cuadre += f'<tr {row_style}><td></td><td><span class="cod">{esc(lid.get("codigo","-"))}</span></td><td><b>{esc(lid.get("nombre","-"))}</b></td><td>{esc(lid.get("pastorZona","-"))}</td><td>{esc(lid.get("supSector","-"))}</td><td class="{"" if tiene else "pend"}">{estado}</td><td class="num">{f"Q{of_lid:,.2f}" if of_lid else "-"}</td></tr>'
-                    html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>{esc(sys_nom or 'REDIL')} — Cuadre Dominical</title>
-                    <style>
-                    *{{margin:0;padding:0;box-sizing:border-box}}@page{{size:letter;margin:0.35in}}body{{font-family:'Inter',-apple-system,sans-serif;background:#f5f6fa;color:#2d3436;padding:0;font-size:9px}}
-                    .rpt{{max-width:100%;margin:0 auto;background:#fff;overflow:hidden}}
-                    .hdr{{background:linear-gradient(135deg,#1a3a5c 0%,#2d6a9f 50%,#3b82c4 100%);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;-webkit-print-color-adjust:exact}}
-                    .hdr-l h1{{font-size:16px;font-weight:900;letter-spacing:-.3px;margin-bottom:2px}}
-                    .hdr-l .sub{{font-size:8.5px;opacity:.85}}
-                    .hdr-badge{{background:rgba(255,255,255,.2);padding:5px 12px;border-radius:20px;font-size:10px;font-weight:800}}
-                    .kpis{{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;padding:10px 16px;background:#f8f9fe;border-bottom:1px solid #eef0f8}}
-                    .kpi{{background:#fff;border-radius:8px;padding:8px 10px;box-shadow:0 1px 3px rgba(0,0,0,.05);border-left:2.5px solid var(--kc,#1a3a5c)}}
-                    .kpi .v{{font-size:15px;font-weight:900;color:#1a3a5c;line-height:1.1}}
-                    .kpi .l{{font-size:7.5px;color:#7f8c9b;font-weight:600;text-transform:uppercase;letter-spacing:.2px}}
-                    .kpi.c0{{--kc:#6366f1}}.kpi.c1{{--kc:#f59e0b}}.kpi.c2{{--kc:#10b981}}.kpi.c3{{--kc:#3b82f6}}.kpi.c4{{--kc:#ef4444}}.kpi.c5{{--kc:#8b5cf6}}
-                    table{{width:100%;border-collapse:collapse;font-size:8px}}
-                    thead th{{background:#1a3a5c;color:#fff;font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;padding:5px 5px;text-align:center;border-right:1px solid rgba(255,255,255,.15);-webkit-print-color-adjust:exact}}
-                    tbody td{{padding:4px 5px;border-bottom:1px solid #f0f2f5;vertical-align:middle;text-align:center}}
-                    tbody td:first-child{{text-align:left;padding-left:10px}}
-                    .dist-row td{{background:#1a3a5c;color:#fff;font-weight:700;font-size:9px;text-align:left;padding:5px 10px}}
-                    .zona-row td{{background:#eef2f8;font-weight:700;font-size:8px;text-align:left;padding:4px 10px}}
-                    .cod{{font-family:monospace;font-size:7.5px;background:#eef0f8;padding:1px 5px;border-radius:4px;color:#2d6a9f;font-weight:700}}
-                    .num{{font-weight:700}}.pend{{color:#dc2626;font-weight:700}}
-                    .footer{{padding:8px 16px;border-top:2px solid #eef0f8;display:flex;justify-content:space-between;font-size:7.5px;color:#7f8c9b}}
-                    </style></head><body><div class="rpt">
-                    <div class="hdr"><div class="hdr-l"><h1>{esc(sys_nom or 'REDIL')}</h1><div class="sub">Cuadre Dominical — {fecha or "Hoy"} — {fecha_gen}</div></div><div class="hdr-badge">{no_serie}</div></div>
-                    <div class="kpis"><div class="kpi c0"><div class="v">{total_lideres}</div><div class="l">Lideres</div></div><div class="kpi c1"><div class="v">{entregaron}</div><div class="l">Entregaron</div></div><div class="kpi c2"><div class="v">{pendientes_c}</div><div class="l">Pendientes</div></div><div class="kpi c3"><div class="v">Q{ofrenda_total:,.2f}</div><div class="l">Ofrenda</div></div><div class="kpi c4"><div class="v">{pct}%</div><div class="l">Cumplimiento</div></div><div class="kpi c5"><div class="v">{len(distritos_list)}</div><div class="l">Distritos</div></div></div>
-                    <table><thead><tr><th>Código</th><th>Líder</th><th>Pastor Zona</th><th>Sup.Sector</th><th>Estado</th><th>Ofrenda</th></tr></thead><tbody>{rows_cuadre}</tbody></table>
-                    <div class="footer"><div><b>{total_lideres}</b> líderes · <b>Q{ofrenda_total:,.2f}</b></div><div>Daniel Martínez · Total App GT</div></div>
-                    </div></body></html>"""
-                    pdf_bytes = pdfkit.from_string(html, False, options={'page-size':'Letter','orientation':'Landscape','margin-top':'0','margin-bottom':'0','margin-left':'0','margin-right':'0','encoding':'UTF-8','no-outline':None,'enable-local-file-access':None})
-                    pdf_b64 = base64.b64encode(pdf_bytes).decode()
+                    pdf = FPDF('L','mm','Letter'); pdf.set_auto_page_break(True,10); pdf.add_page(); pdf.set_margin(10)
+                    w=pdf.w-20; cx=10
+                    pdf.set_fill_color(26,58,92); pdf.rect(0,0,pdf.w,24,'F')
+                    pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',16)
+                    pdf.set_xy(cx,4); pdf.cell(w*0.6,7,pdf_safe(sys_nom or'REDIL')[:35],0,0,'L')
+                    pdf.set_font('Helvetica','',8); pdf.set_text_color(185,205,230)
+                    pdf.set_xy(cx,13); pdf.cell(w*0.6,4,f'Cuadre Dominical - {fecha or "Hoy"} - {fecha_gen}',0,0,'L')
+                    bw,bh=58,14; bx=pdf.w-cx-bw; by=5
+                    pdf.set_fill_color(255,255,255); pdf.rect(bx,by,bw,bh,'F'); pdf.set_draw_color(26,58,92); pdf.rect(bx,by,bw,bh,'D')
+                    pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',11)
+                    pdf.set_xy(bx,by+1); pdf.cell(bw,7,no_serie,0,0,'C')
+                    pdf.set_font('Helvetica','',7); pdf.set_text_color(100,115,135)
+                    pdf.set_xy(bx,by+8); pdf.cell(bw,4,f'{total_lideres} lideres',0,0,'C')
+                    # KPIs
+                    colors=[(99,102,241),(16,185,129),(239,68,68),(249,115,22)]
+                    kpi_data=[('Lideres',str(total_lideres)),('Entregaron',str(entregaron)),('Pendientes',str(pendientes_c)),('Ofrenda',pdf_safe(f'Q{ofrenda_total:,.2f}'))]
+                    cw4=(w-9)/4; ch4=18; gap=3; y0=29
+                    for i,(lbl,val) in enumerate(kpi_data):
+                        x=cx+i*(cw4+gap); y=y0
+                        pdf.set_fill_color(250,252,255); pdf.set_draw_color(220,228,240); pdf.rect(x,y,cw4,ch4,'DF')
+                        cr,cg,cb=colors[i]; pdf.set_fill_color(cr,cg,cb); pdf.rect(x+1,y+2,3,ch4-4,'F')
+                        pdf.set_text_color(cr,cg,cb); pdf.set_font('Helvetica','B',12)
+                        pdf.set_xy(x+7,y+2); pdf.cell(cw4-10,8,val,0,0,'L')
+                        pdf.set_font('Helvetica','',6.5); pdf.set_text_color(130,140,155)
+                        pdf.set_xy(x+7,y+11); pdf.cell(cw4-10,4,lbl.upper(),0,0,'L')
+                    # Table
+                    tbl_y=y0+ch4+10; rh=5
+                    cols=[('Codigo',18),('Lider',50),('D-Z',16),('Pastor Zona',42),('Sup.Sector',38),('Estado',24),('Ofrenda',22)]
+                    cw_list=[c[1] for c in cols]; ch_headers=[c[0] for c in cols]
+                    pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',7)
+                    pdf.set_y(tbl_y)
+                    for ci,cwv in enumerate(cw_list): pdf.set_xy(sum(cw_list[:ci])+cx,tbl_y); pdf.cell(cwv,6,ch_headers[ci],0,0,'C',True)
+                    y=tbl_y+6; max_rows=int((190-y)/rh)
+                    for ri,lid in enumerate(data):
+                        if ri>0 and ri%max_rows==0:
+                            pdf.add_page(); y=12; pdf.set_fill_color(26,58,92)
+                            pdf.set_y(y)
+                            for ci2,cwv2 in enumerate(cw_list): pdf.set_xy(sum(cw_list[:ci2])+cx,y); pdf.cell(cwv2,6,ch_headers[ci2],0,0,'C',True)
+                            y+=6
+                        pdf.set_fill_color(252,254,255) if ri%2==0 else pdf.set_fill_color(246,249,253)
+                        tiene=lid.get("tieneReporte",False); of_v=lid.get("ofrendaTotal",0)
+                        vals=[pdf_safe(lid.get("codigo","-"))[:8],pdf_safe(lid.get("nombre","-"))[:30],f'D{pdf_safe(lid.get("distrito","?"))} Z{pdf_safe(lid.get("zona","?"))}',pdf_safe(lid.get("pastorZona","-"))[:24],pdf_safe(lid.get("supSector","-"))[:22],'',f'Q{of_v:,.2f}' if of_v else '-']
+                        for vi,cwv3 in enumerate(cw_list):
+                            xpos=sum(cw_list[:vi])+cx
+                            if vi==5:
+                                if not tiene:
+                                    pdf.set_fill_color(254,238,238); pdf.set_draw_color(240,190,190); pdf.rect(xpos+1,y+0.5,cwv3-4,rh-1,'DF')
+                                    pdf.set_text_color(200,40,40)
+                                else:
+                                    pdf.set_fill_color(234,252,240); pdf.set_draw_color(175,225,195); pdf.rect(xpos+1,y+0.5,cwv3-4,rh-1,'DF')
+                                    pdf.set_text_color(5,150,105)
+                                pdf.set_font('Helvetica','B',6); pdf.set_xy(xpos,y)
+                                pdf.cell(cwv3,rh,'Pendiente'if not tiene else'Entregado',0,0,'C')
+                            else:
+                                pdf.set_text_color(50,60,75); pdf.set_xy(xpos,y); pdf.set_font('Helvetica','',6.5)
+                                pdf.cell(cwv3,rh,vals[vi],0,0,'L'if vi<2 else'C',True)
+                        y+=rh
+                    pdf.set_y(y+4); pdf.set_draw_color(180,195,215); pdf.set_line_width(0.4)
+                    pdf.line(cx,pdf.get_y(),pdf.w-cx,pdf.get_y())
+                    pdf.set_font('Helvetica','B',7.5); pdf.set_text_color(26,58,92)
+                    pdf.set_xy(cx,pdf.get_y()+2); pdf.cell(w*0.5,5,f'{total_lideres} lideres - Q{ofrenda_total:,.2f}',0,0,'L')
+                    pdf.set_font('Helvetica','',6.5); pdf.set_text_color(140,150,165)
+                    pdf.set_xy(cx,pdf.get_y()+6); pdf.cell(w,5,'Daniel Martinez - Total App GT',0,0,'R')
+                    pdf_b64 = base64.b64encode(pdf.output()).decode()
                     gr = GeneradorReporte(
                         no_serie=no_serie, fecha_inicio=fecha or None, fecha_fin=fecha or None,
                         total_ofrenda=round(ofrenda_total,2), total_asistencia=total_lideres,
@@ -1244,15 +1265,75 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     db.add(gr)
                     db.commit()
                     try:
-                        import pdfkit, base64
-                        options = {'page-size':'Letter','orientation':'Landscape','margin-top':'0','margin-bottom':'0','margin-left':'0','margin-right':'0','encoding':'UTF-8','no-outline':None,'enable-local-file-access':None}
-                        pdf_bytes = pdfkit.from_string(html, False, options=options)
-                        pdf_b64 = base64.b64encode(pdf_bytes).decode()
+                        from fpdf import FPDF
+                        pdf = FPDF('L','mm','Letter'); pdf.set_auto_page_break(True,10)
+                        pdf.add_page(); pdf.set_margin(10)
+                        w=pdf.w-20; cx=10
+                        pdf.set_fill_color(26,58,92); pdf.rect(0,0,pdf.w,24,'F'); pdf.set_fill_color(18,48,78); pdf.rect(0,0,pdf.w,2,'F')
+                        pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',16)
+                        pdf.set_xy(cx,4); pdf.cell(w*0.6,7,pdf_safe(sys_nom or'REDIL')[:35],0,0,'L')
+                        pdf.set_font('Helvetica','',8); pdf.set_text_color(185,205,230)
+                        pdf.set_xy(cx,13); pdf.cell(w*0.6,4,f'{pdf_safe(tipo)[:45]}  -  {rango_str}  -  {fecha_gen}',0,0,'L')
+                        bw,bh=58,14; bx=pdf.w-cx-bw; by=5
+                        pdf.set_fill_color(255,255,255); pdf.rect(bx,by,bw,bh,'F'); pdf.set_draw_color(26,58,92); pdf.set_line_width(0.3); pdf.rect(bx,by,bw,bh,'D')
+                        pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',11)
+                        pdf.set_xy(bx,by+1); pdf.cell(bw,7,no_serie,0,0,'C')
+                        pdf.set_font('Helvetica','',7); pdf.set_text_color(100,115,135)
+                        pdf.set_xy(bx,by+8); pdf.cell(bw,4,f'{total_grupos} reportes',0,0,'C')
+                        colors=[(99,102,241),(16,185,129),(239,68,68),(249,115,22),(59,130,246),(139,92,246),(20,184,166),(245,158,11)]
+                        kpi_data=[('Grupos',str(total_grupos)),('Asistencia',str(total_asist)),('Ofrenda',pdf_safe(f'Q{total_ofrenda:,.2f}')),('Recibidas',f'{estado_pct}%'),('Pendientes',str(total_pendientes)),('Hermanos',str(total_hnos)),('Amigos',str(total_amigos)),('Ninos',str(total_ninos))]
+                        cw=(w-21)/4; ch=18; gap=7; y0=29
+                        for i,(lbl,val) in enumerate(kpi_data):
+                            x=cx+(i%4)*(cw+gap); y=y0+(i//4)*(ch+gap)
+                            pdf.set_fill_color(250,252,255); pdf.set_draw_color(220,228,240); pdf.rect(x,y,cw,ch,'DF')
+                            cr,cg,cb=colors[i]; pdf.set_fill_color(cr,cg,cb); pdf.set_draw_color(cr,cg,cb); pdf.rect(x+1,y+2,3,ch-4,'F')
+                            pdf.set_text_color(cr,cg,cb); pdf.set_font('Helvetica','B',12)
+                            pdf.set_xy(x+7,y+2); pdf.cell(cw-10,8,val,0,0,'L')
+                            pdf.set_font('Helvetica','',6.5); pdf.set_text_color(130,140,155)
+                            pdf.set_xy(x+7,y+11); pdf.cell(cw-10,4,lbl.upper(),0,0,'L')
+                        tbl_y=y0+2*ch+2*gap+8; rh=5.2
+                        pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',7)
+                        cols=[('Codigo',18),('Lider',48),('Fecha',20),('Dist-Zona',18),('AGF',14),('Ofrenda',20),('Hnos',12),('Amg',12),('Estado',28)]
+                        cw_list=[c[1] for c in cols]; ch_headers=[c[0] for c in cols]
+                        pdf.set_y(tbl_y)
+                        for ci,cwv in enumerate(cw_list): pdf.set_xy(sum(cw_list[:ci])+cx,tbl_y); pdf.cell(cwv,6,ch_headers[ci],0,0,'C',True)
+                        y=tbl_y+6; max_rows=int((190-y)/rh)
+                        for ri,r in enumerate(reportes):
+                            if ri>0 and ri%max_rows==0:
+                                pdf.add_page(); y=12; pdf.set_fill_color(26,58,92)
+                                pdf.set_y(y)
+                                for ci2,cwv2 in enumerate(cw_list): pdf.set_xy(sum(cw_list[:ci2])+cx,y); pdf.cell(cwv2,6,ch_headers[ci2],0,0,'C',True)
+                                y+=6
+                            pdf.set_fill_color(252,254,255) if ri%2==0 else pdf.set_fill_color(246,249,253)
+                            pend=r.ofrenda_recibida in("Pendiente",""); of_v=float(r.ofrenda_total or 0)
+                            vals=[pdf_safe(r.codigo or'-')[:10],pdf_safe(r.lider or'-')[:28],str(r.fecha)[:10]if r.fecha else'-',f'D{pdf_safe(r.distrito or"?")} Z{pdf_safe(r.zona or"?")}',str(r.asistencia or 0),f'Q{of_v:,.2f}',str(r.hnos or 0),str(r.amigos or 0),'']
+                            for vi,cwv3 in enumerate(cw_list):
+                                xpos=sum(cw_list[:vi])+cx
+                                if vi==8:
+                                    if pend:
+                                        pdf.set_fill_color(254,238,238); pdf.set_draw_color(240,190,190); pdf.rect(xpos+1,y+0.5,cwv3-4,rh-1,'DF')
+                                        pdf.set_text_color(200,40,40)
+                                    else:
+                                        pdf.set_fill_color(234,252,240); pdf.set_draw_color(175,225,195); pdf.rect(xpos+1,y+0.5,cwv3-4,rh-1,'DF')
+                                        pdf.set_text_color(5,150,105)
+                                    pdf.set_font('Helvetica','B',6.5); pdf.set_xy(xpos,y)
+                                    pdf.cell(cwv3,rh,'Pendiente'if pend else'Recibida',0,0,'C')
+                                else:
+                                    pdf.set_text_color(50,60,75); pdf.set_xy(xpos,y); pdf.set_font('Helvetica','',7)
+                                    pdf.cell(cwv3,rh,vals[vi],0,0,'L'if vi<2 else'C',True)
+                            y+=rh
+                        pdf.set_y(y+4); pdf.set_draw_color(180,195,215); pdf.set_line_width(0.4)
+                        pdf.line(cx,pdf.get_y(),pdf.w-cx,pdf.get_y())
+                        pdf.set_font('Helvetica','B',7.5); pdf.set_text_color(26,58,92)
+                        pdf.set_xy(cx,pdf.get_y()+2); pdf.cell(w*0.5,5,f'{total_grupos} reportes  -  Q{total_ofrenda:,.2f}',0,0,'L')
+                        pdf.set_font('Helvetica','',6.5); pdf.set_text_color(140,150,165)
+                        pdf.set_xy(cx,pdf.get_y()+6); pdf.cell(w,5,'Daniel Martinez  -  Total App GT',0,0,'R')
+                        pdf_b64 = base64.b64encode(pdf.output()).decode()
                         gr.pdf_data=pdf_b64; gr.archivo_generado=f"/api/pdf/{no_serie}"; db.commit()
                         result["pdfUrl"]=f"/api/pdf/{no_serie}"; result["pdfStatus"]="PDF listo"
                     except Exception as e:
                         result["pdfError"]=str(e)
-                        print(f"PDF pdfkit fallo ({no_serie}): {e}")
+                        print(f"PDF fallo ({no_serie}): {e}")
                 except: pass
             return result
 
