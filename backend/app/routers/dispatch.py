@@ -11,6 +11,8 @@ import jwt
 import bcrypt
 import os
 import json
+import io
+import base64
 import requests
 from datetime import datetime, timedelta
 from dateutil import parser as dateparser
@@ -1240,7 +1242,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     db.add(gr)
                     db.commit()
                     try:
-                        from weasyprint import HTML as WHTML; import base64, io
+                        from weasyprint import HTML as WHTML
                         pdf_bytes = WHTML(string=html).write_pdf()
                         pdf_b64 = base64.b64encode(pdf_bytes).decode()
                         gr.pdf_data=pdf_b64; gr.archivo_generado=f"/api/pdf/{no_serie}"; db.commit()
