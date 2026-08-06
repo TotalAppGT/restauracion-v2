@@ -390,11 +390,11 @@ function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
     var ht=document.getElementById('hdrTitle');
     if(err||!cfg||!cfg.ok){
       if(ht)ht.textContent='Iglesia Restauracion';
-      if(logoEl)logoEl.innerHTML='<img src=\"'+fallbackLogo+'\" style=\"width:100%;height:100%;object-fit:cover\" alt=\"Logo\" onerror=\"this.parentElement.innerHTML=\\'⛪\\'\">';
+      if(logoEl)logoEl.innerHTML='<img src="'+fallbackLogo+'" style="width:100%;height:100%;object-fit:cover" alt="Logo" onerror="this.innerHTML=\'⛪\'">';
       return;
     }
     var logoUrl=cfg.logoUrl||cfg.logo_url||fallbackLogo;
-    if(logoEl)logoEl.innerHTML='<img src=\"'+logoUrl+'\" style=\"width:100%;height:100%;object-fit:cover\" alt=\"Logo\" onerror=\"this.parentElement.innerHTML=\\'⛪\\'\">';
+    if(logoEl)logoEl.innerHTML='<img src="'+logoUrl+'" style="width:100%;height:100%;object-fit:cover" alt="Logo" onerror="this.innerHTML=\'⛪\'">';
     if(cfg.nombre){
       if(ht)ht.textContent=cfg.nombre;
     } else if(ht && ht.textContent==='Cargando...'){
