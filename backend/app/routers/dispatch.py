@@ -11,7 +11,6 @@ import jwt
 import bcrypt
 import os
 import json
-import io
 import base64
 import requests
 from datetime import datetime, timedelta
@@ -791,7 +790,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "ofrendaTotal": round(ofrenda_total, 2)}
             if generar_pdf:
                 try:
-                    from weasyprint import HTML as WHTML; import base64, io; from datetime import datetime as dt2
+                    from datetime import datetime as dt2
                     sys_nom = ""
                     try:
                         cfg2 = db.query(Configuracion).filter(Configuracion.clave == "nombre").first()
@@ -1249,24 +1248,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         result["pdfUrl"]=f"/api/pdf/{no_serie}"; result["pdfStatus"]="PDF listo"
                     except Exception as e:
                         result["pdfError"]=str(e)
-                        print(f"PDF weasyprint fallo ({no_serie}), intentando fpdf: {e}")
-                        try:
-                            from fpdf import FPDF; pdf2 = FPDF('L','mm','Letter'); pdf2.set_auto_page_break(True,12)
-                            pdf2.add_page(); pdf2.set_margin(12); w2=pdf2.w-24; cx2=12
-                            pdf2.set_fill_color(26,58,92); pdf2.rect(0,0,pdf2.w,28,'F')
-                            pdf2.set_draw_color(59,130,200); pdf2.set_line_width(1.5); pdf2.line(0,28,pdf2.w,28)
-                            pdf2.set_text_color(255,255,255); pdf2.set_font('Helvetica','B',18)
-                            pdf2.set_xy(cx2,6); pdf2.cell(w2*0.65,8,pdf_safe(sys_nom or'REDIL')[:40],0,0,'L')
-                            pdf2.set_font('Helvetica','',9); pdf2.set_text_color(200,215,240)
-                            pdf2.set_xy(cx2,16); pdf2.cell(w2*0.65,5,f'{pdf_safe(tipo)[:50]}  -  {pdf_safe(rango_str)}  -  {fecha_gen}',0,0,'L')
-                            pdf2.set_fill_color(255,255,255); pdf2.set_text_color(26,58,92)
-                            pdf2.set_font('Helvetica','B',13); pdf2.set_xy(pdf2.w-75,5); pdf2.cell(63,10,no_serie,0,0,'C',True)
-                            pdf2.set_font('Helvetica','',8); pdf2.set_xy(pdf2.w-75,15.5); pdf2.cell(63,5,f'{total_grupos} reportes',0,0,'C')
-                            buf2=io.BytesIO(); pdf2.output(buf2); pdf_b64_fb=base64.b64encode(buf2.getvalue()).decode()
-                            gr.pdf_data=pdf_b64_fb; gr.archivo_generado=f"/api/pdf/{no_serie}"; db.commit()
-                            result["pdfUrl"]=f"/api/pdf/{no_serie}"; result["pdfStatus"]="PDF (fpdf fallback)"
-                        except Exception as e2:
-                            result["pdfError"]=str(e2); print(f"PDF fpdf fallback tambien fallo: {e2}")
+                        print(f"PDF weasyprint fallo ({no_serie}): {e}")
                 except: pass
             return result
 
