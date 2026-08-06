@@ -1257,7 +1257,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         pdf.set_xy(cx,13); pdf.cell(w*0.6,4,f'{pdf_safe(tipo)[:45]}  -  {rango_str}  -  {fecha_gen}',0,0,'L')
                         # Right: rounded badge
                         bw,bh=58,14; bx=pdf.w-cx-bw; by=5
-                        pdf.set_fill_color(255,255,255); pdf.rounded_rect(bx,by,bw,bh,3,'F')
+                        pdf.set_fill_color(255,255,255); pdf.rect(bx,by,bw,bh,'F')
+                        pdf.set_draw_color(26,58,92); pdf.set_line_width(0.3)
+                        pdf.rect(bx,by,bw,bh,'D')
                         pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',11)
                         pdf.set_xy(bx,by+1); pdf.cell(bw,7,no_serie,0,0,'C')
                         pdf.set_font('Helvetica','',7); pdf.set_text_color(100,115,135)
@@ -1270,7 +1272,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                             x=cx+(i%4)*(cw+gap); y=y0+(i//4)*(ch+gap)
                             # Card bg rounded
                             pdf.set_fill_color(250,252,255); pdf.set_draw_color(220,228,240)
-                            pdf.rounded_rect(x,y,cw,ch,3,'DF')
+                            pdf.rect(x,y,cw,ch,'DF')
                             # Colored left accent
                             cr,cg,cb=colors[i]; pdf.set_fill_color(cr,cg,cb)
                             pdf.set_draw_color(cr,cg,cb); pdf.rect(x+1,y+2,3,ch-4,'F')
@@ -1305,11 +1307,11 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                                 if vi==8:
                                     if pend:
                                         pdf.set_fill_color(254,238,238); pdf.set_draw_color(240,190,190)
-                                        pdf.rounded_rect(xpos+1,y+0.5,cwv3-4,rh-1,2,'DF')
+                                        pdf.rect(xpos+1,y+0.5,cwv3-4,rh-1,'DF')
                                         pdf.set_text_color(200,40,40); pdf.set_xy(xpos,y)
                                     else:
                                         pdf.set_fill_color(234,252,240); pdf.set_draw_color(175,225,195)
-                                        pdf.rounded_rect(xpos+1,y+0.5,cwv3-4,rh-1,2,'DF')
+                                        pdf.rect(xpos+1,y+0.5,cwv3-4,rh-1,'DF')
                                         pdf.set_text_color(5,150,105); pdf.set_xy(xpos,y)
                                     pdf.set_font('Helvetica','B',6.5)
                                     pdf.cell(cwv3,rh,'Pendiente'if pend else'Recibida',0,0,'C')
