@@ -27,6 +27,10 @@ def pdf_safe(s):
     """Convierte texto a latin-1 para fuentes core de fpdf2 (sin emojis ni unicode raro)."""
     return str(s or "").encode("latin-1", "replace").decode("latin-1")
 
+def _htmlesc(s):
+    """Escape HTML entities. Separada de esc() para evitar conflicto con variable local en dispatch()."""
+    return str(s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
 def _formatear_whatsapp(msg, pdf_url=""):
     sep = " | "
     from datetime import datetime
@@ -1382,8 +1386,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 if not email or not msg_construido:
                     return {"ok": False, "msg": "Correo y mensaje requeridos"}
                 try:
-                    esc = lambda s: (s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
-                    lineas_html = "".join(f'<div style="margin-bottom:8px">{esc(l)}</div>' for l in msg_construido.split("\n"))
+                    lineas_html = "".join(f'<div style="margin-bottom:8px">{_htmlesc(l)}</div>' for l in msg_construido.split("\n"))
                     html = '<div style="font-family:sans-serif;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;max-width:520px">'
                     html += '<div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:20px"><b style="font-size:18px">Iglesia Restauracion</b><div style="font-size:13px;opacity:.9">Restaurando vidas y familias</div></div>'
                     html += '<div style="padding:22px">'+lineas_html+'</div></div>'
