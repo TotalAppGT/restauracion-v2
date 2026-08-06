@@ -1254,7 +1254,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',16)
                         pdf.set_xy(cx,4); pdf.cell(w*0.6,7,pdf_safe(sys_nom or'REDIL')[:35],0,0,'L')
                         pdf.set_font('Helvetica','',8); pdf.set_text_color(185,205,230)
-                        pdf.set_xy(cx,13); pdf.cell(w*0.6,4,f'{pdf_safe(tipo)[:45]}  —  {rango_str}  —  {fecha_gen}',0,0,'L')
+                        pdf.set_xy(cx,13); pdf.cell(w*0.6,4,f'{pdf_safe(tipo)[:45]}  -  {rango_str}  -  {fecha_gen}',0,0,'L')
                         # Right: rounded badge
                         bw,bh=58,14; bx=pdf.w-cx-bw; by=5
                         pdf.set_fill_color(255,255,255); pdf.rounded_rect(bx,by,bw,bh,3,'F')
@@ -1322,7 +1322,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         pdf.set_y(y+4); pdf.set_draw_color(180,195,215); pdf.set_line_width(0.4)
                         pdf.line(cx,pdf.get_y(),pdf.w-cx,pdf.get_y())
                         pdf.set_font('Helvetica','B',7.5); pdf.set_text_color(26,58,92)
-                        pdf.set_xy(cx,pdf.get_y()+2); pdf.cell(w*0.5,5,f'{total_grupos} reportes  —  Q{total_ofrenda:,.2f}',0,0,'L')
+                        pdf.set_xy(cx,pdf.get_y()+2); pdf.cell(w*0.5,5,f'{total_grupos} reportes  -  Q{total_ofrenda:,.2f}',0,0,'L')
                         pdf.set_font('Helvetica','',6.5); pdf.set_text_color(140,150,165)
                         pdf.set_xy(cx,pdf.get_y()+6); pdf.cell(w,5,'Daniel Martinez  ·  Total App GT  ·  Sistema REDIL',0,0,'R')
                         buf2=pdf.output()
