@@ -1264,7 +1264,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         pdf.set_xy(bx,by+8); pdf.cell(bw,4,f'{total_grupos} reportes',0,0,'C')
                         # KPI cards
                         colors=[(99,102,241),(16,185,129),(239,68,68),(249,115,22),(59,130,246),(139,92,246),(20,184,166),(245,158,11)]
-                        kpi_data=[('Grupos',str(total_grupos)),('Asistencia',str(total_asist)),('Ofrenda',f'Q{total_ofrenda:,.2f}'),('Recibidas',f'{estado_pct}%'),('Pendientes',str(total_pendientes)),('Hermanos',str(total_hnos)),('Amigos',str(total_amigos)),('Ninos',str(total_ninos))]
+                        kpi_data=[('Grupos',str(total_grupos)),('Asistencia',str(total_asist)),('Ofrenda',pdf_safe(f'Q{total_ofrenda:,.2f}')),('Recibidas',f'{estado_pct}%'),('Pendientes',str(total_pendientes)),('Hermanos',str(total_hnos)),('Amigos',str(total_amigos)),('Ninos',str(total_ninos))]
                         cw=(w-21)/4; ch=18; gap=7; y0=29
                         for i,(lbl,val) in enumerate(kpi_data):
                             x=cx+(i%4)*(cw+gap); y=y0+(i//4)*(ch+gap)
