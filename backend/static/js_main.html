@@ -1217,9 +1217,10 @@ function renderRepTable(){
   }
   tb.innerHTML=data.map(r=>{
     const isPend=r['Ofrenda Recibida']==='Pendiente'||r['Ofrenda Recibida']==='';
-    var metodo=r['Reporte']||(r['Tipo de Reporte']==='Reporte Digital'?'Digital':r['Tipo de Reporte']==='Reporte Físico'?'Físico':'');
+    var origen=r['Origen']||(r['reporte_origen']||'Fisico');
     var reunionTipo=r['Tipo de Reporte']||'';
-    if(reunionTipo==='Reporte Digital'||reunionTipo==='Reporte Físico')reunionTipo='Mixta (Reunión Regular)';
+    if(reunionTipo==='Reporte Digital'||reunionTipo==='Reporte Fisico')reunionTipo='Mixta (Reunion Regular)';
+    var origBadge=origen==='Digital'?'<span class="bdg bi">Digital</span>':'<span class="bdg bb">Fisico</span>';
     return `<tr style="${isPend?'background:#fff5f5;':''}">
     <td>${fmtD(r['Fecha'])}</td>
     <td><span class="bdg bb">${esc(r['Codigo'])}</span></td>
@@ -1231,7 +1232,7 @@ function renderRepTable(){
     <td>${r['Ofrenda Iglesia']||''}</td><td>${r['Ofrenda Bus']||''}</td>
     <td><b>${r['Ofrenda Total']||''}</b></td>
     <td>${r['Total']||0}</td>
-    <td><span class="bdg ${metodo==='Digital'?'bi':'bb'}">${metodo||'—'}</span><br><span style="font-size:10px;color:var(--tx2)">${esc(reunionTipo)}</span></td>
+    <td>${origBadge}<br><span style="font-size:10px;color:var(--tx2)">${esc(reunionTipo)}</span></td>
     <td>${isPend
       ?`<button class="btn btn-ok btn-sm" style="font-size:11px;white-space:nowrap;padding:5px 10px" onclick="confirmarOfrendaRapido('${esc(r['ID'])}','${esc(r['Lider'])}')"><i class="fas fa-check-circle"></i> Marcar Recibida</button>`
       :`<span class="bdg bg" style="font-size:11px">✓ Recibida</span>`
@@ -5214,6 +5215,8 @@ function renderCuadre(el){
     <button class="btn btn-sm" style="background:#6b7280;color:#fff" onclick="nav(reporteModPrevio||'reportes')"><i class="fas fa-arrow-left"></i> Volver</button>
     <button class="btn btn-pr btn-sm" onclick="cargarCuadreDominical()"><i class="fas fa-sync"></i> Actualizar</button>
     <button class="btn btn-in btn-sm" onclick="exportXLS(_cuadreData||[],'Cuadre Dominical','cuadre')"><i class="fas fa-file-excel"></i> Excel</button>
+    <button class="btn btn-er btn-sm" onclick="generarCuadrePDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+    <button class="btn btn-ol btn-sm" id="btnAgruparCuadre" onclick="toggleAgruparCuadre()"><i class="fas fa-layer-group"></i> Agrupar por Distrito</button>
   </div></div>
   <div class="card" style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px">
@@ -5279,11 +5282,12 @@ function cargarCuadreDominical(){
     loading(false);
     if(!res||!res.ok){toast('Error al cargar cuadre','er');return;}
     _cuadreData=res.data||[];
+    _cuadreAgrupado=res.agrupado||[];
     document.getElementById('cuaTotal').textContent=res.totalLideres||0;
     document.getElementById('cuaEntregaron').textContent=res.entregaron||0;
     document.getElementById('cuaPendientes').textContent=res.pendientes||0;
     document.getElementById('cuaOfrenda').textContent='Q '+(res.ofrendaTotal||0).toFixed(2);
-    renderCuadreTable(_cuadreData);
+    if(_mostrandoAgrupado){renderCuadreAgrupado(_cuadreAgrupado);}else{renderCuadreTable(_cuadreData);}
   });
 }
 
@@ -5347,6 +5351,44 @@ function startAutoRefresh(){
       if(cfg&&cfg.ok){cfg._loaded=true;APP.config=Object.assign(APP.config||{},cfg);aplicarTema(cfg);}
     });
   },180000);
+}
+
+// ── CUADRE AGRUPADO + PDF ─────────────────────────────────
+var _cuadreAgrupado=null;
+var _mostrandoAgrupado=false;
+function toggleAgruparCuadre(){
+  _mostrandoAgrupado=!_mostrandoAgrupado;
+  var btn=document.getElementById('btnAgruparCuadre');
+  if(btn)btn.innerHTML=_mostrandoAgrupado?'<i class="fas fa-list"></i> Vista Normal':'<i class="fas fa-layer-group"></i> Agrupar por Distrito';
+  if(_mostrandoAgrupado){renderCuadreAgrupado(_cuadreAgrupado);}else{renderCuadreTable(_cuadreData);}
+}
+function renderCuadreAgrupado(agrupado){
+  var tb=document.getElementById('cuaTb');if(!tb)return;
+  if(!agrupado||!agrupado.length){tb.innerHTML='<tr><td colspan="8"><div class="empty-r"><p>Sin datos agrupados</p></div></td></tr>';return;}
+  var html='';
+  agrupado.forEach(function(dg){
+    html+='<tr style="background:#1a3a5c;color:#fff"><td colspan="8"><b style="font-size:14px">Distrito '+esc(dg.distrito)+'</b> &mdash; '+dg.entregaron+'/'+dg.totalLideres+' entregaron, '+dg.pendientes+' pendientes &mdash; Q'+fmtN(dg.ofrendaTotal)+'</td></tr>';
+    (dg.zonas||[]).forEach(function(zg){
+      html+='<tr style="background:#eef2f8;font-weight:700"><td colspan="2"></td><td colspan="6">Zona '+esc(zg.zona)+' | '+zg.entregaron+'/'+zg.totalLideres+' entregaron | Q'+fmtN(zg.ofrendaTotal)+'</td></tr>';
+      (zg.lideres||[]).forEach(function(r){
+        var tiene=r.tieneReporte;
+        var bg=tiene?'':'style="background:#fff5f5"';
+        var estado=tiene?(r.ofrendaRecibida?'<span class="bdg bg">Completado</span>':'<span class="bdg bo">Pend.Ofrenda</span>'):'<span class="bdg br">Sin Reporte</span>';
+        html+='<tr '+bg+'><td></td><td><span class="bdg bb">'+esc(r.codigo||'')+'</span></td><td><b>'+esc(r.nombre||'')+'</b></td><td>'+esc(r.pastorZona||'')+'</td><td>'+esc(r.supSector||'')+'</td><td>'+(tiene?'<i class="fas fa-check-circle" style="color:var(--ok)"></i> Si':'<i class="fas fa-times-circle" style="color:var(--err)"></i> No')+'</td><td>'+fmtQ(r.ofrendaTotal||0)+'</td><td>'+estado+'</td></tr>';
+      });
+    });
+  });
+  tb.innerHTML=html;
+}
+function generarCuadrePDF(){
+  var fecha=document.getElementById('cuaFecha')?.value||today();
+  loading(true);
+  call('getCuadreDominical',{fecha:fecha,generarPDF:true},function(_,res){
+    loading(false);
+    if(res&&res.pdfUrl){window.open(res.pdfUrl,'_blank');toast('PDF generado: '+res.pdfSerie,'ok');}
+    else if(res&&res.pdfError){toast('Error generando PDF: '+res.pdfError,'er');}
+    else{toast('No se pudo generar el PDF','er');}
+  });
 }
 
 // ── CARGAR CONFIG EN PANTALLA DE LOGIN ANTES DE INGRESAR ──

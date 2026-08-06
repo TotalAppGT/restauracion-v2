@@ -355,7 +355,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if payload.get("codigo"):
                 q = q.filter(Reporte.codigo == payload["codigo"])
             reportes = q.order_by(Reporte.fecha.desc()).limit(500).all()
-            return [{"ID": r.id, "Codigo": r.codigo, "Lider": r.lider, "Fecha": str(r.fecha) if r.fecha else "", "Distrito": r.distrito, "Zona": r.zona, "Area": r.area, "Sector": r.sector, "Grupo": r.grupo, "Ofrenda Total": float(r.ofrenda_total or 0), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Asistencia Grupo Familiar": r.asistencia or 0, "Hnos": r.hnos or 0, "Amigos": r.amigos or 0, "Niños": r.ninos or 0, "Tipo de Reporte": r.tipo_reporte or ""} for r in reportes]
+            return [{"ID": r.id, "Codigo": r.codigo, "Lider": r.lider, "Fecha": str(r.fecha) if r.fecha else "", "Distrito": r.distrito, "Zona": r.zona, "Area": r.area, "Sector": r.sector, "Grupo": r.grupo, "Ofrenda Total": float(r.ofrenda_total or 0), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Asistencia Grupo Familiar": r.asistencia or 0, "Hnos": r.hnos or 0, "Amigos": r.amigos or 0, "Niños": r.ninos or 0, "Tipo de Reporte": r.tipo_reporte or "", "Origen": r.reporte_origen or "Fisico"} for r in reportes]
 
         if action == "saveReporte":
             return save_entity(db, Reporte, HERMANO_MAP, payload)
@@ -748,6 +748,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             reportes = reportes_q.all()
             codigos_reportados = set(r.codigo for r in reportes)
             data, total_lideres, entregaron, pendientes_c, ofrenda_total = [], 0, 0, 0, 0.0
+            # Agrupar por distrito
+            distritos = {}
             for h in lideres:
                 total_lideres += 1
                 reporto = h.codigo_lead in codigos_reportados
@@ -756,8 +758,115 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 ofrenda_total += ofrenda
                 if reporto: entregaron += 1
                 else: pendientes_c += 1
-                data.append({"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": True if rpts and rpts[0].ofrenda_recibida not in ("Pendiente", "", None) else False, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or ""})
-            return {"ok": True, "data": data, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "ofrendaTotal": round(ofrenda_total, 2)}
+                d = str(h.distrito or "?")
+                z = str(h.zona or "?")
+                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": True if rpts and rpts[0].ofrenda_recibida not in ("Pendiente", "", None) else False, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
+                data.append(item)
+                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "ofrendaTotal": 0.0, "zonas": {}}
+                distritos[d]["totalLideres"] += 1
+                if reporto: distritos[d]["entregaron"] += 1
+                else: distritos[d]["pendientes"] += 1
+                distritos[d]["ofrendaTotal"] += ofrenda
+                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "ofrendaTotal": 0.0, "lideres": []}
+                distritos[d]["zonas"][z]["totalLideres"] += 1
+                if reporto: distritos[d]["zonas"][z]["entregaron"] += 1
+                else: distritos[d]["zonas"][z]["pendientes"] += 1
+                distritos[d]["zonas"][z]["ofrendaTotal"] += ofrenda
+                distritos[d]["zonas"][z]["lideres"].append(item)
+            # Convertir zonas de dict a lista ordenada
+            distritos_list = []
+            for dk in sorted(distritos.keys()):
+                dg = distritos[dk]
+                zonas_list = []
+                for zk in sorted(dg["zonas"].keys()):
+                    zg = dg["zonas"][zk]
+                    zg["ofrendaTotal"] = round(zg["ofrendaTotal"], 2)
+                    zonas_list.append(zg)
+                dg["zonas"] = zonas_list
+                dg["ofrendaTotal"] = round(dg["ofrendaTotal"], 2)
+                distritos_list.append(dg)
+            generar_pdf = payload.get("generarPDF", False)
+            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "ofrendaTotal": round(ofrenda_total, 2)}
+            if generar_pdf:
+                try:
+                    from fpdf import FPDF; import base64, io; from datetime import datetime as dt2
+                    sys_nom = ""
+                    try:
+                        cfg2 = db.query(Configuracion).filter(Configuracion.clave == "nombre").first()
+                        if cfg2: sys_nom = cfg2.valor
+                    except: pass
+                    today_str = dt2.now().strftime('%Y%m%d')
+                    count = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie.like(f'%cuadre_{today_str}%')).count() + 1
+                    no_serie = f"cuadre_{today_str}_{count:03d}"
+                    fecha_gen = dt2.now().strftime('%d/%m/%Y %I:%M %p')
+                    pdf = FPDF('P','mm','Letter'); pdf.set_auto_page_break(True,14)
+                    pdf.add_page(); pdf.set_margin(14)
+                    w=pdf.w-28; cx=14
+                    # Header
+                    pdf.set_fill_color(26,58,92); pdf.rect(0,0,pdf.w,26,'F')
+                    pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',16)
+                    pdf.set_xy(cx,6); pdf.cell(w,8,pdf_safe(sys_nom or'REDIL')[:40],0,0,'L')
+                    pdf.set_font('Helvetica','',8); pdf.set_text_color(200,215,240)
+                    pdf.set_xy(cx,15); pdf.cell(w*0.7,5,f'Cuadre Dominical - {fecha or "Hoy"} - Generado {fecha_gen}',0,0,'L')
+                    pdf.set_fill_color(255,255,255); pdf.set_text_color(26,58,92)
+                    pdf.set_font('Helvetica','B',11); pdf.set_xy(pdf.w-58,5)
+                    pdf.cell(44,10,no_serie,0,0,'C',True)
+                    pdf.set_font('Helvetica','',7); pdf.set_text_color(26,58,92)
+                    pdf.set_xy(pdf.w-58,15.5); pdf.cell(44,5,f'{total_lideres} lideres',0,0,'C')
+                    # Resumen KPIs
+                    pdf.set_y(32); kpi_data=[('Total Lideres',str(total_lideres)),('Entregaron',str(entregaron)),('Pendientes',str(pendientes_c)),('Ofrenda',f'Q{ofrenda_total:,.2f}')]
+                    kpi_w=w/4; kpi_h=16
+                    for i,(lbl,val) in enumerate(kpi_data):
+                        xs=cx+i*kpi_w; pdf.set_fill_color(245,247,252)
+                        pdf.rect(xs,32,kpi_w-3,kpi_h,'F')
+                        pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',12)
+                        pdf.set_xy(xs+3,33); pdf.cell(kpi_w-6,7,val,0,0,'L')
+                        pdf.set_font('Helvetica','',7); pdf.set_text_color(130,140,155)
+                        pdf.set_xy(xs+3,40); pdf.cell(kpi_w-6,5,lbl.upper(),0,0,'L')
+                    # Tabla por distrito
+                    yt=pdf.get_y()+kpi_h+6
+                    for dg in distritos_list:
+                        pdf.set_fill_color(37,99,168); pdf.set_text_color(255,255,255)
+                        pdf.set_font('Helvetica','B',10); pdf.set_xy(cx,yt)
+                        pdf.cell(w,7,f'Distrito {dg["distrito"]} - {dg["entregaron"]} entregaron, {dg["pendientes"]} pendientes - Q{dg["ofrendaTotal"]:,.2f}',0,0,'L',True)
+                        yt+=8
+                        for zg in dg.get("zonas",[]):
+                            pdf.set_fill_color(245,247,252); pdf.set_text_color(50,60,75)
+                            pdf.set_font('Helvetica','B',8); pdf.set_xy(cx+4,yt)
+                            pdf.cell(w-4,6,f'Zona {zg["zona"]} | {zg["entregaron"]}/{zg["totalLideres"]} entregaron | Q{zg["ofrendaTotal"]:,.2f}',0,0,'L')
+                            yt+=6
+                            for lid in zg.get("lideres",[]):
+                                if yt>250: pdf.add_page(); yt=14
+                                color = (5,150,105) if lid["tieneReporte"] else (200,40,40)
+                                estado_str = 'Entregado' if lid["tieneReporte"] else 'PENDIENTE'
+                                pdf.set_text_color(*color); pdf.set_font('Helvetica','',7)
+                                pdf.set_xy(cx+8,yt); pdf.cell(20,4.5,pdf_safe(lid.get("codigo","-"))[:10],0,0,'L')
+                                pdf.set_xy(cx+30,yt); pdf.cell(60,4.5,pdf_safe(lid.get("nombre","-"))[:35],0,0,'L')
+                                pdf.set_xy(cx+92,yt); pdf.cell(30,4.5,estado_str,0,0,'L')
+                                of_lid = lid.get("ofrendaTotal",0)
+                                pdf.set_xy(cx+124,yt); pdf.cell(30,4.5,f'Q{of_lid:,.2f}' if of_lid else '-',0,0,'L')
+                                yt+=4.5
+                            yt+=2
+                        yt+=3
+                    # Footer
+                    pdf.set_y(yt+4); pdf.set_draw_color(59,130,200); pdf.set_line_width(.6)
+                    pdf.line(cx,pdf.get_y(),pdf.w-cx,pdf.get_y())
+                    pdf.set_font('Helvetica','B',8); pdf.set_text_color(26,58,92)
+                    pdf.set_xy(cx,pdf.get_y()+2); pdf.cell(w*0.5,6,f'Total: {total_lideres} lideres - Q{ofrenda_total:,.2f}',0,0,'L')
+                    pdf.set_font('Helvetica','',7); pdf.set_text_color(140,150,165)
+                    pdf.set_xy(cx,pdf.get_y()+7); pdf.cell(w,5,'Daniel Martinez - Total App GT',0,0,'R')
+                    buf=io.BytesIO(); pdf.output(buf); pdf_b64=base64.b64encode(buf.getvalue()).decode()
+                    gr = GeneradorReporte(
+                        no_serie=no_serie, fecha_inicio=fecha or None, fecha_fin=fecha or None,
+                        total_ofrenda=round(ofrenda_total,2), total_asistencia=total_lideres,
+                        titulo_reporte="Cuadre Dominical", archivo_generado=f"/api/pdf/{no_serie}"
+                    )
+                    gr.pdf_data = pdf_b64; db.add(gr); db.commit()
+                    result["pdfUrl"] = f"/api/pdf/{no_serie}"; result["pdfSerie"] = no_serie
+                except Exception as e:
+                    result["pdfError"] = str(e)
+                    print(f"PDF cuadre fallo: {e}")
+            return result
 
         # ── CARGA MASIVA ──
         if action == "getEncabezadosCargaMasiva":
