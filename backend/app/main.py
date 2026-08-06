@@ -283,7 +283,8 @@ def _procesar_notificaciones_pendientes():
             from app.email_utils import send_email
             db = SessionLocal()
             try:
-                ahora = datetime.utcnow()
+                ahora_utc = datetime.utcnow()
+                ahora = ahora_utc - timedelta(hours=6)  # Guatemala UTC-6
                 notifs = db.query(Notificacion).filter(Notificacion.activo == True).all()
                 for n in notifs:
                     hora_e = str(n.hora_envio or "08:00")

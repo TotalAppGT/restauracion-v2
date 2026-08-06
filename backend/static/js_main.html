@@ -4879,7 +4879,7 @@ function editNotif(id){
   var body='<div class="fg2">'
     +'<div class="fgg full"><label>Titulo</label><input class="fc" id="nfTitulo" value="'+esc(n.titulo||'')+'" placeholder="Ej: Reunion de Lideres"></div>'
     +'<div class="fgg"><label>Tipo</label><select class="fc" id="nfTipo" onchange="nfTipoChange()">'+Object.keys(tipos).map(function(k){return '<option value="'+k+'"'+(n.tipo===k?' selected':'')+'>'+tipos[k]+'</option>';}).join('')+'</select></div>'
-    +'<div id="nfFieldsEvento" style="display:'+(n.tipo==='recordatorio'||n.tipo==='reunion'?'block':'none')+'"><div class="fgg"><label>Evento</label><input class="fc" id="nfEvento" value="'+esc(n.evento||'')+'" placeholder="Nombre del evento"></div><div class="row2"><div class="fgg"><label>Fecha del evento</label><input class="fc" type="date" id="nfFechaEvento" value="'+esc(n.fecha_evento||'')+'"></div><div class="fgg"><label>Hora del evento</label><input class="fc" type="time" id="nfHoraEvento" value="'+esc(n.hora_evento||'')+'"></div></div><div class="fgg"><label>Lugar</label><input class="fc" id="nfLugar" value="'+esc(n.lugar||'')+'" placeholder="Iglesia Central"></div></div>'
+    +'<div id="nfFieldsEvento" style="display:block"><div class="fgg"><label>Evento</label><input class="fc" id="nfEvento" value="'+esc(n.evento||'')+'" placeholder="Nombre del evento"></div><div class="row2"><div class="fgg"><label>Fecha del evento</label><input class="fc" type="date" id="nfFechaEvento" value="'+esc(n.fecha_evento||'')+'"></div><div class="fgg"><label>Hora del evento</label><input class="fc" type="time" id="nfHoraEvento" value="'+esc(n.hora_evento||'')+'"></div></div><div class="fgg"><label>Lugar</label><input class="fc" id="nfLugar" value="'+esc(n.lugar||'')+'" placeholder="Iglesia Central"></div></div>'
     +'<div id="nfFieldsMensaje"><div class="fgg full"><label>Mensaje</label><textarea class="fc" id="nfMensaje" rows="3" placeholder="Contenido del mensaje...">'+esc(n.mensaje||'')+'</textarea></div></div>'
     +'<div class="row2"><div class="fgg"><label>Cita biblica (opcional)</label><input class="fc" id="nfCita" value="'+esc(n.cita_biblica||'')+'" placeholder="Juan 3:16"></div>'
     +'<div class="fgg"><label>Info extra</label><input class="fc" id="nfInfoExtra" value="'+esc(n.info_extra||'')+'" placeholder="Telefono, datos adicionales..."></div></div>'
@@ -4951,8 +4951,8 @@ function nfFreqChange(){
   document.getElementById('nfDiaM').style.display=f==='mensual'?'block':'none';
 }
 function nfTipoChange(){
-  var t=g('nfTipo');var ev=document.getElementById('nfFieldsEvento');var msg=document.getElementById('nfFieldsMensaje');
-  if(t==='recordatorio'||t==='reunion'){if(ev)ev.style.display='block';}else{if(ev)ev.style.display='none';}
+  var ev=document.getElementById('nfFieldsEvento');
+  if(ev)ev.style.display='block';
 }
 function renderDestList(){
   var el=document.getElementById('nfDestList');if(!el)return;
