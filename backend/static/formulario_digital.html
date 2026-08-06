@@ -446,19 +446,21 @@ function onCodigoInput(){
   document.getElementById('liderNotFound').style.display='none';
   liderData=null;
   var q=document.getElementById('codigo').value.trim();
-  if(q.length<2){document.getElementById('codigoSugerencias').style.display='none';return;}
+  var sug=document.getElementById('codigoSugerencias');
+  if(q.length<2){sug.style.display='none';return;}
   clearTimeout(window._sugTimer);
+  sug.innerHTML='<div style="padding:12px;text-align:center;color:var(--tx3);font-size:13px">Buscando...</div>';
+  sug.style.display='block';
   window._sugTimer=setTimeout(function(){
     call('buscarLideres',{query:q},function(err,res){
       var sug=document.getElementById('codigoSugerencias');if(!sug)return;
       var data=(res&&res.data)||(Array.isArray(res)?res:[]);
-      if(!data||!data.length){sug.style.display='none';return;}
+      if(!data||!data.length){sug.innerHTML='<div style="padding:12px;text-align:center;color:var(--tx2);font-size:13px">Sin resultados para "'+esc(q)+'"</div>';return;}
       sug.innerHTML=data.map(function(h){
-        return '<div class=sug-item onclick=seleccionarLider(''+esc(h.CodigoL||'')+'') style=padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee onmouseenter=this.style.background='#f0f4ff' onmouseleave=this.style.background='#fff'>'
-          +'<div style=font-weight:700;color:var(--pr);font-size:14px>'+esc(h.NombreL)+' <span style=font-family:monospace;font-size:12px;color:var(--pr2);margin-left:6px>'+esc(h.CodigoL)+'</span></div>'
-          +'<div style=font-size:11px;color:var(--tx3)>D'+esc(h.Distrito)+' Z'+esc(h.Zona)+' | '+esc(h['Pastor Zona']||'-')+'</div></div>';
+        return '<div class="sug-item" onclick="seleccionarLider(\''+esc(h.CodigoL||'')+'\')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee" onmouseenter="this.style.background=\'#f0f4ff\'" onmouseleave="this.style.background=\'#fff\'">'
+          +'<div style="font-weight:700;color:var(--pr);font-size:14px">'+esc(h.NombreL)+' <span style="font-family:monospace;font-size:12px;color:var(--pr2);margin-left:6px">'+esc(h.CodigoL)+'</span></div>'
+          +'<div style="font-size:11px;color:var(--tx3)">D'+esc(h.Distrito)+' Z'+esc(h.Zona)+' | '+esc(h['Pastor Zona']||'-')+'</div></div>';
       }).join('');
-      sug.style.display='block';
     });
   },300);
 }
@@ -469,12 +471,16 @@ function seleccionarLider(codigo){
 }
 function buscarLider(){
   const query=document.getElementById('codigo').value.trim();
-  if(!query){notify('Ingresa un código o nombre','wa');return;}
-  const btn=document.querySelector('.card .btn-submit');btn.disabled=true;
+  if(!query){notify('Ingresa un codigo o nombre','wa');return;}
+  var btn=document.querySelector('.card .btn-submit');
+  var origHTML=btn.innerHTML;
+  btn.disabled=true;
+  btn.innerHTML='<div class="spinner" style="display:inline-block"></div> Buscando...';
   document.getElementById('liderInfo').style.display='none';
   document.getElementById('liderNotFound').style.display='none';
   call('buscarLideres',{query:query},function(err,res){
     btn.disabled=false;
+    btn.innerHTML=origHTML;
     var data=(res&&res.data)||(Array.isArray(res)?res:[]);
     if(!data||!data.length){document.getElementById('liderNotFound').style.display='block';return;}
     if(data.length===1){
@@ -486,11 +492,11 @@ function buscarLider(){
     }else{
       var sug=document.getElementById('codigoSugerencias');if(!sug)return;
       sug.innerHTML=data.map(function(h){
-        return '<div class=sug-item onclick=seleccionarLider(''+esc(h.CodigoL||'')+'') style=padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee onmouseenter=this.style.background='#f0f4ff' onmouseleave=this.style.background='#fff'>'
-          +'<div style=font-weight:700;color:var(--pr);font-size:14px>'+esc(h.NombreL)+' <span style=font-family:monospace;font-size:12px;color:var(--pr2);margin-left:6px>'+esc(h.CodigoL)+'</span></div>'
-          +'<div style=font-size:11px;color:var(--tx3)>D'+esc(h.Distrito)+' Z'+esc(h.Zona)+' | '+esc(h['Pastor Zona']||'-')+'</div></div>';
+        return '<div class="sug-item" onclick="seleccionarLider(\''+esc(h.CodigoL||'')+'\')" style="padding:10px 14px;cursor:pointer;border-bottom:1px solid #eee" onmouseenter="this.style.background=\'#f0f4ff\'" onmouseleave="this.style.background=\'#fff\'">'
+          +'<div style="font-weight:700;color:var(--pr);font-size:14px">'+esc(h.NombreL)+' <span style="font-family:monospace;font-size:12px;color:var(--pr2);margin-left:6px">'+esc(h.CodigoL)+'</span></div>'
+          +'<div style="font-size:11px;color:var(--tx3)">D'+esc(h.Distrito)+' Z'+esc(h.Zona)+' | '+esc(h['Pastor Zona']||'-')+'</div></div>';
       }).join('');
-      sug.innerHTML+='<div style=text-align:center;padding:8px;font-size:11px;color:var(--tx3);cursor:pointer;background:#fafbfc onclick=document.getElementById('codigoSugerencias').style.display='none'>'+data.length+' resultados — Cerrar</div>';
+      sug.innerHTML+='<div style="text-align:center;padding:8px;font-size:11px;color:var(--tx3);cursor:pointer;background:#fafbfc" onclick="document.getElementById(\'codigoSugerencias\').style.display=\'none\'">'+data.length+' resultados — Cerrar</div>';
       sug.style.display='block';
     }
   });
