@@ -322,7 +322,8 @@ def _procesar_notificaciones_pendientes():
                     if wa_links:
                         msg_wa += " | " + " | ".join(wa_links[:2])
                     for d in dests:
-                        num = str(d.get("numero", "") or "").replace("+", "").replace(" ", "").replace("-", "")
+                        raw_num = str(d.get("numero", "") or "").replace("+", "").replace(" ", "").replace("-", "")
+                        num = ("502"+raw_num if len(raw_num)==8 and raw_num.isdigit() and not raw_num.startswith("502") else raw_num)
                         email = str(d.get("email", "") or d.get("correo", "") or "").strip()
                         grupo_id = str(d.get("grupo_id", "") or d.get("gid", "") or "").strip()
                         canal = str(d.get("canal") or "").lower()

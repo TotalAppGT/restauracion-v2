@@ -1381,6 +1381,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             nums = [n.strip() for n in to_num.split(",") if n.strip()] if to_num and "," in to_num else [to_num] if to_num else []
             if not nums:
                 return {"ok": False, "msg": "Número requerido"}
+            # Normalizar numeros: 8 digitos -> 502XXXXXXXX
+            nums = [("502"+n if len(n.replace("+","").replace(" ",""))==8 and not n.startswith("+") and not n.startswith("502") else n) for n in nums]
             if forzar_texto:
                 result = send_whatsapp_bulk(nums, msg) if len(nums) > 1 else send_whatsapp(nums[0], msg)
             else:
@@ -1399,6 +1401,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             forzar_texto = payload.get("usarPlantilla") == False
             if not numbers or not msg:
                 return {"ok": False, "msg": "Números y mensaje requeridos"}
+            # Normalizar numeros: 8 digitos -> 502XXXXXXXX
+            numbers = [("502"+n if len(str(n).replace("+","").replace(" ",""))==8 and not str(n).startswith("+") and not str(n).startswith("502") else str(n)) for n in numbers]
             if forzar_texto:
                 return send_whatsapp_bulk(numbers, msg, pdf_url if pdf_url else None)
             texto_wa = _formatear_whatsapp(msg, pdf_url)
@@ -1496,7 +1500,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             from app.email_utils import send_email
             from datetime import datetime as dt
             from app.models import NotificacionLog
-            numero = str(payload.get("numero", "") or "").replace("+", "").replace(" ", "")
+            numero = str(payload.get("numero", "") or "").replace("+", "").replace(" ", "").replace("-", "")
+            if len(numero) == 8 and numero.isdigit() and not numero.startswith("502"):
+                numero = "502" + numero
             email = str(payload.get("email", "") or "").strip()
             tipo = str(payload.get("tipo", "") or "general").lower()
             titulo = payload.get("titulo", "")
