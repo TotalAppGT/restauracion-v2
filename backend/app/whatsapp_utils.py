@@ -123,6 +123,7 @@ def send_whatsapp_document(to_number, pdf_url, caption="", filename="informe.pdf
             if parts:
                 no_serie = parts[-1]
                 fn = f"REDIL_{no_serie}.pdf"
+        print(f"[WA-DOC] Enviando a {clean_number} link={pdf_url} fn={fn}")
         resp = httpx.post(
             WHATSAPP_API,
             json={
@@ -141,13 +142,15 @@ def send_whatsapp_document(to_number, pdf_url, caption="", filename="informe.pdf
             },
             timeout=30
         )
+        print(f"[WA-DOC] Status={resp.status_code} Resp={resp.text[:500]}")
         wamid = _extract_wamid(resp) if resp.status_code < 400 else ""
         if wamid:
             _registrar_en_proxy(wamid)
         if resp.status_code < 400:
             _registrar_telefono_en_proxy(clean_number, internal_user_id)
-        return {"ok": resp.status_code < 400, "msg": resp.text[:200] if resp.status_code >= 400 else "Enviado", "wamid": wamid}
+        return {"ok": resp.status_code < 400, "msg": resp.text[:300] if resp.status_code >= 400 else "Enviado", "wamid": wamid, "status_code": resp.status_code}
     except Exception as e:
+        print(f"[WA-DOC] Error: {e}")
         return {"ok": False, "msg": str(e)}
 
 def sincronizar_contactos_proxy(db_session=None):
