@@ -1962,10 +1962,11 @@ function genReporte(){
     bar.style='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;padding:10px;background:var(--bg3);border-radius:8px';
     if(res.pdfUrl){
       bar.innerHTML='<span style="color:var(--ok);font-weight:700;font-size:13px"><i class="fas fa-check-circle"></i> PDF guardado: <b>'+esc(res.noSerie)+'.pdf</b></span>'
-        +'<a href="'+res.pdfUrl+'" target="_blank" class="btn btn-ok btn-sm"><i class="fas fa-external-link-alt"></i> Ver en Drive</a>'
+        +'<button class="btn btn-pr btn-sm" onclick="generarPDFCliente(\''+esc(res.noSerie)+'\')"><i class="fas fa-file-pdf"></i> Generar PDF Profesional</button>'
         +'<button class="btn btn-er btn-sm" onclick="imprimirGen()"><i class="fas fa-print"></i> Imprimir</button>';
     } else {
-      bar.innerHTML='<button class="btn btn-er" onclick="imprimirGen()"><i class="fas fa-print"></i> Imprimir / Ver PDF</button>'
+      bar.innerHTML='<button class="btn btn-pr" onclick="generarPDFCliente(\''+esc(res.noSerie)+'\')"><i class="fas fa-file-pdf"></i> Generar PDF Profesional</button>'
+        +'<button class="btn btn-er" onclick="imprimirGen()"><i class="fas fa-print"></i> Imprimir / Ver PDF</button>'
         +'<button class="btn btn-in btn-sm" onclick="dlExcelGen()"><i class="fas fa-file-excel"></i> Excel</button>';
     }
     prev.appendChild(bar);
@@ -1993,6 +1994,37 @@ function guardarEnDrive(btn){
   });
 }
 function dlExcelGen(){loading(true);call('getReportes',{desde:g('gD'),hasta:g('gH'),lider:g('gL'),supSector:g('gSS'),supArea:g('gSA')},(_,d)=>{loading(false);exportXLS(Array.isArray(d)?d:[],'Reportes','reporte_'+today());});}
+function generarPDFCliente(serie){
+  var ifr=document.querySelector('#genPreview iframe');
+  if(!ifr||!_lastGenHtml){toast('Genera un reporte primero','wa');return;}
+  loading(true);
+  toast('Generando PDF profesional...','in');
+  var opt={margin:[5,5,5,5],filename:serie+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,letterRendering:true},jsPDF:{unit:'mm',format:'letter',orientation:'landscape'}};
+  try{
+    html2pdf().set(opt).from(_lastGenHtml).outputPdf('blob').then(function(blob){
+      var reader=new FileReader();
+      reader.onloadend=function(){
+        var b64=reader.result;
+        call('guardarPDF',{noSerie:serie,pdfBase64:b64},function(_,res){
+          loading(false);
+          if(res&&res.ok){
+            toast('PDF profesional guardado! Ya disponible para envio por WhatsApp','ok',5000);
+            loadRepo();
+          }else{
+            toast('Error al guardar PDF: '+(res&&res.msg||''),'er');
+          }
+        });
+      };
+      reader.readAsDataURL(blob);
+    }).catch(function(e){
+      loading(false);
+      toast('Error: '+e.message,'er');
+    });
+  }catch(e){
+    loading(false);
+    toast('Error: '+e.message,'er');
+  }
+}
 function imprimirGen(){
   if(_lastGenHtml){abrirVentanaImpresion(_lastGenHtml);return;}
   loading(true);

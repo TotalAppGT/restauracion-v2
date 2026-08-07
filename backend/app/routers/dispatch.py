@@ -478,7 +478,20 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             "firebaseProjectId": configs.get("firebaseProjectId", os.getenv("FIREBASE_PROJECT_ID", "totalappgt-d15b9")),
             "firebaseAppId": configs.get("firebaseAppId", os.getenv("FIREBASE_APP_ID", "")), "whatsapp_soporte": configs.get("whatsapp_soporte","+502 5830-3182"), "nombre_soporte": configs.get("nombre_soporte","Total App GT - Daniel Martínez"), "titleMantenimiento": configs.get("titleMantenimiento","Sistema en Mantenimiento"), "msgMantenimiento": configs.get("msgMantenimiento","El sistema no está disponible en este momento."), "bot_habilitado": configs.get("bot_habilitado","True") == "True", "ai_provider": configs.get("ai_provider","auto"), "servicios_dinamicos": [], "cron_lunes": configs.get("cron_lunes","Lunes 6:30 PM"), "cron_jueves": configs.get("cron_jueves","Jueves 6:30 PM"), "cron_domTarde": configs.get("cron_domTarde","Domingo 10:30 AM"), "theme_colors": configs.get("theme_colors",""), "smtp_user": configs.get("smtp_user","totalappgt@gmail.com"), "smtp_password": configs.get("smtp_password", os.getenv("RESEND_API_KEY",""))}
 
-        if action == "saveConfig":
+        if action == "guardarPDF":
+            no_serie = payload.get("noSerie", "").strip()
+            pdf_b64 = payload.get("pdfBase64", "")
+            if not no_serie or not pdf_b64:
+                return {"ok": False, "msg": "noSerie y pdfBase64 requeridos"}
+            if pdf_b64.startswith("data:"):
+                pdf_b64 = pdf_b64.split(",",1)[-1]
+            gr = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie == no_serie).first()
+            if not gr:
+                return {"ok": False, "msg": "Reporte no encontrado"}
+            gr.pdf_data = pdf_b64
+            gr.archivo_generado = f"/api/pdf/{no_serie}"
+            db.commit()
+            return {"ok": True, "msg": "PDF guardado"}
             for key, val in payload.items():
                 if key in ("token", "action"): continue
                 existing = db.query(Configuracion).filter(Configuracion.clave == key).first()
