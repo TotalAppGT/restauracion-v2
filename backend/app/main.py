@@ -318,7 +318,7 @@ def _procesar_notificaciones_pendientes():
                         n.evento, n.lugar, n.hora_evento, n.info_extra,
                         cita_biblica=n.cita_biblica, fecha_evento=n.fecha_evento
                     )
-                    msg_wa = msg_raw.replace("\n", "  |  ")
+                    msg_wa = msg_raw
                     if wa_links:
                         msg_wa += " | " + " | ".join(wa_links[:2])
                     for d in dests:
