@@ -10,6 +10,8 @@ WORKDIR /app
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+RUN find /usr/lib -name "*gobject*" 2>/dev/null || echo "NO gobject found"
+RUN find /usr/lib -name "*glib*" 2>/dev/null || echo "NO glib found"
 RUN python -c "from weasyprint import HTML; print('weasyprint OK')"
 
 COPY backend/ .
