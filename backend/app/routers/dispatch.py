@@ -1278,148 +1278,68 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     db.add(gr)
                     db.commit()
                     try:
-                        from fpdf import FPDF
-                        pdf = FPDF('L','mm','Letter')
-                        pdf.set_auto_page_break(True,8)
-                        pdf.add_page()
-                        pw = pdf.w
-                        ph = pdf.h
-                        mx = 10
-                        rw = pw - 20
-                        # ── HEADER ──
-                        pdf.set_fill_color(26,58,92)
-                        pdf.rect(0,0,pw,22,'F')
-                        pdf.set_fill_color(18,48,78)
-                        pdf.rect(0,0,pw,2,'F')
-                        pdf.set_text_color(255,255,255)
-                        pdf.set_font('Helvetica','B',15)
-                        pdf.set_xy(mx,3); pdf.cell(rw*0.55,7,pdf_safe(sys_nom or'REDIL Iglesia Restauracion')[:38],0,0,'L')
-                        pdf.set_font('Helvetica','',7.5)
-                        pdf.set_text_color(190,210,230)
-                        fecha_ahora = datetime.now().strftime('%d/%m/%Y %I:%M %p')
-                        pdf.set_xy(mx,12); pdf.cell(rw*0.55,4,f'{pdf_safe(tipo)[:45]}  |  {rango_str}  |  Generado: {fecha_ahora}',0,0,'L')
-                        # Badge
-                        bx2=pw-mx-56; by2=3; bw2=56; bh2=15
-                        pdf.set_fill_color(255,255,255); pdf.rect(bx2,by2,bw2,bh2,'F')
-                        pdf.set_draw_color(60,120,180); pdf.set_line_width(0.4); pdf.rect(bx2,by2,bw2,bh2,'D')
-                        pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',10)
-                        pdf.set_xy(bx2,by2+1); pdf.cell(bw2,7,no_serie,0,0,'C')
-                        pdf.set_font('Helvetica','',6.5); pdf.set_text_color(100,120,140)
-                        pdf.set_xy(bx2,by2+8); pdf.cell(bw2,4,f'{total_grupos} reportes  |  Q{total_ofrenda:,.0f}',0,0,'C')
-                        # ── KPI ROW ──
-                        kpi_y = 26
-                        kpi_data = [
-                            ('REPORTES', str(total_grupos), (99,102,241)),
-                            ('ASISTENCIA', str(total_asist), (16,185,129)),
-                            ('OFRENDA', 'Q'+f'{total_ofrenda:,.0f}', (239,68,68)),
-                            ('% RECIBIDAS', f'{estado_pct}%', (59,130,246)),
-                            ('PENDIENTES', str(total_pendientes), (249,115,22)),
-                            ('HERMANOS', str(total_hnos), (139,92,246)),
-                            ('AMIGOS', str(total_amigos), (20,184,166)),
-                            ('NINOS', str(total_ninos), (245,158,11)),
-                        ]
-                        nk = len(kpi_data)
-                        kgap = 4
-                        kw = (rw - (nk-1)*kgap) / nk
-                        kh = 16
-                        for i,(lbl,val,(cr,cg,cb)) in enumerate(kpi_data):
-                            kx = mx + i*(kw+kgap)
-                            pdf.set_fill_color(248,251,255); pdf.set_draw_color(215,225,240); pdf.rect(kx,kpi_y,kw,kh,'DF')
-                            pdf.set_fill_color(cr,cg,cb); pdf.rect(kx,kpi_y,2.5,kh,'F')
-                            pdf.set_text_color(cr,cg,cb); pdf.set_font('Helvetica','B',12)
-                            pdf.set_xy(kx+4,kpi_y+1); pdf.cell(kw-6,8,val,0,0,'L')
-                            pdf.set_font('Helvetica','',6); pdf.set_text_color(120,130,145)
-                            pdf.set_xy(kx+4,kpi_y+10); pdf.cell(kw-6,4,lbl,0,0,'L')
-                        # ── TABLE ──
-                        col_defs = [
-                            ('Codigo', 15, 'L'),
-                            ('Lider', 38, 'L'),
-                            ('Fecha', 18, 'C'),
-                            ('Distrito-Zona', 17, 'C'),
-                            ('AGF', 12, 'C'),
-                            ('Ofrenda', 18, 'C'),
-                            ('Hnos', 10, 'C'),
-                            ('Amigos', 10, 'C'),
-                            ('Ninos', 10, 'C'),
-                            ('Estado', 22, 'C'),
-                        ]
-                        col_names = [c[0] for c in col_defs]
-                        col_widths = [c[1] for c in col_defs]
-                        col_aligns = [c[2] for c in col_defs]
-                        # Scale up to fill remaining width
-                        total_cw = sum(col_widths)
-                        if total_cw < rw:
-                            scale = rw / total_cw
-                            col_widths = [w*scale for w in col_widths]
-                        th = 6
-                        ty = kpi_y + kh + 8
-                        pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255)
-                        pdf.set_font('Helvetica','B',7)
-                        xh = mx
-                        for ci in range(len(col_names)):
-                            pdf.set_xy(xh,ty); pdf.cell(col_widths[ci],th,col_names[ci],0,0,'C',True)
-                            xh += col_widths[ci]
-                        # ── ROWS ──
-                        row_h = 5
-                        ry = ty + th
-                        max_rows = int((ph - ry - 14) / row_h)
-                        for ri,r in enumerate(reportes):
-                            if ri > 0 and ri % max_rows == 0:
-                                pdf.add_page(); ry = 10
-                                xh = mx; pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',7)
-                                for ci in range(len(col_names)):
-                                    pdf.set_xy(xh,ry); pdf.cell(col_widths[ci],th,col_names[ci],0,0,'C',True)
-                                    xh += col_widths[ci]
-                                ry += th
-                            pdf.set_fill_color(253,254,255) if ri%2==0 else pdf.set_fill_color(246,250,254)
-                            pend = r.ofrenda_recibida in ("Pendiente","")
-                            of_v = float(r.ofrenda_total or 0)
-                            vals = [
-                                pdf_safe(r.codigo or '-')[:12],
-                                pdf_safe(r.lider or '-')[:28],
-                                str(r.fecha)[:10] if r.fecha else '-',
-                                'D'+pdf_safe(str(r.distrito or '?'))+' Z'+pdf_safe(str(r.zona or '?')),
-                                str(r.asistencia or 0),
-                                'Q'+f'{of_v:,.0f}',
-                                str(r.hnos or 0),
-                                str(r.amigos or 0),
-                                str(r.ninos or 0),
-                                '',
-                            ]
-                            cv = mx
-                            for vi in range(len(col_defs)):
-                                if vi == 9:  # Estado
-                                    if pend:
-                                        pdf.set_fill_color(254,238,238); pdf.set_draw_color(230,190,190)
-                                        pdf.set_text_color(190,30,30)
-                                        estado_txt = 'Pendiente'
-                                    else:
-                                        pdf.set_fill_color(233,251,240); pdf.set_draw_color(170,220,195)
-                                        pdf.set_text_color(5,140,95)
-                                        estado_txt = 'Recibida'
-                                    pdf.set_font('Helvetica','B',6.5)
-                                    wbadge = col_widths[vi] - 3
-                                    pdf.rect(cv+1.5,ry,wbadge,row_h,'DF')
-                                    pdf.set_xy(cv,ry); pdf.cell(col_widths[vi],row_h,estado_txt,0,0,'C')
-                                else:
-                                    pdf.set_text_color(45,55,70); pdf.set_font('Helvetica','',7)
-                                    pdf.set_xy(cv,ry); pdf.cell(col_widths[vi],row_h,vals[vi],0,0,col_aligns[vi],True)
-                                cv += col_widths[vi]
-                            ry += row_h
-                        # ── FOOTER ──
-                        pdf.set_y(ry+3)
-                        pdf.set_draw_color(180,195,215); pdf.set_line_width(0.4)
-                        pdf.line(mx,pdf.get_y(),pw-mx,pdf.get_y())
-                        pdf.set_font('Helvetica','B',7); pdf.set_text_color(26,58,92)
-                        pdf.set_xy(mx,pdf.get_y()+2); pdf.cell(rw*0.5,5,f'{total_grupos} reportes  |  Q{total_ofrenda:,.2f}  |  {fecha_ahora}',0,0,'L')
-                        pdf.set_font('Helvetica','',6); pdf.set_text_color(130,140,155)
-                        pdf.set_xy(mx,pdf.get_y()+6); pdf.cell(rw,4,f'Generado por {sys_nom or "REDIL"}  |  redilrestauracion.totalappgt.online',0,0,'R')
-                        pdf_b64 = base64.b64encode(pdf.output()).decode()
+                        from weasyprint import HTML as WHTML
+                        pdf_bytes = WHTML(string=html).write_pdf()
+                        pdf_b64 = base64.b64encode(pdf_bytes).decode()
                         gr.pdf_data=pdf_b64; gr.archivo_generado=f"/api/pdf/{no_serie}"; db.commit()
                         result["pdfUrl"]=f"/api/pdf/{no_serie}"; result["pdfStatus"]="PDF listo"
                     except Exception as e:
-                        result["pdfError"]=str(e)
-                        print(f"PDF fallo ({no_serie}): {e}")
+                        print(f"WeasyPrint fallo ({no_serie}): {e}, usando fpdf...")
+                        try:
+                            from fpdf import FPDF
+                            pdf = FPDF('L','mm','Letter'); pdf.set_auto_page_break(True,10)
+                            pdf.add_page()
+                            pw=pdf.w; ph=pdf.h; mx=10; rw=pw-20
+                            pdf.set_fill_color(26,58,92); pdf.rect(0,0,pw,22,'F')
+                            pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',15)
+                            pdf.set_xy(mx,3); pdf.cell(rw*0.55,7,pdf_safe(sys_nom or'REDIL')[:38],0,0,'L')
+                            pdf.set_font('Helvetica','',7.5); pdf.set_text_color(190,210,230)
+                            pdf.set_xy(mx,12); pdf.cell(rw*0.55,4,f'{pdf_safe(tipo)[:45]}  |  {rango_str}  |  {fecha_gen}',0,0,'L')
+                            bx2=pw-mx-56; by2=3; pdf.set_fill_color(255,255,255); pdf.rect(bx2,by2,56,15,'F')
+                            pdf.set_draw_color(60,120,180); pdf.rect(bx2,by2,56,15,'D')
+                            pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',10)
+                            pdf.set_xy(bx2,by2+1); pdf.cell(56,7,no_serie,0,0,'C')
+                            pdf.set_font('Helvetica','',6.5); pdf.set_text_color(100,120,140)
+                            pdf.set_xy(bx2,by2+8); pdf.cell(56,4,f'{total_grupos} rep  |  Q{total_ofrenda:,.0f}',0,0,'C')
+                            kpi=[(str(total_grupos),'REPORTES',(99,102,241)),(str(total_asist),'ASISTENCIA',(16,185,129)),(f'Q{total_ofrenda:,.0f}','OFRENDA',(239,68,68)),(f'{estado_pct}%','RECIBIDAS',(59,130,246)),(str(total_pendientes),'PENDIENTES',(249,115,22)),(str(total_hnos),'HNOS',(139,92,246)),(str(total_amigos),'AMIGOS',(20,184,166)),(str(total_ninos),'NINOS',(245,158,11))]
+                            kw=(rw-7*4)/8; kh=15; ky=26
+                            for i,(v,l,(cr,cg,cb)) in enumerate(kpi):
+                                kx=mx+i*(kw+4); pdf.set_fill_color(248,251,255); pdf.set_draw_color(215,225,240); pdf.rect(kx,ky,kw,kh,'DF')
+                                pdf.set_fill_color(cr,cg,cb); pdf.rect(kx,ky,2.5,kh,'F')
+                                pdf.set_text_color(cr,cg,cb); pdf.set_font('Helvetica','B',11); pdf.set_xy(kx+4,ky+1); pdf.cell(kw-6,7,v,0,0,'L')
+                                pdf.set_font('Helvetica','',5.5); pdf.set_text_color(120,130,145); pdf.set_xy(kx+4,ky+10); pdf.cell(kw-6,4,l,0,0,'L')
+                            cd=[('Codigo',15,'L'),('Lider',38,'L'),('Fecha',18,'C'),('D-Z',17,'C'),('AGF',12,'C'),('Ofrenda',18,'C'),('Hnos',10,'C'),('Amg',10,'C'),('Ninos',10,'C'),('Estado',22,'C')]
+                            cw=[c[1]for c in cd]; scale=rw/sum(cw); cw=[w*scale for w in cw]; ch=[c[0]for c in cd]; ca=[c[2]for c in cd]
+                            ty=ky+kh+8; th=6; pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',7)
+                            xh=mx
+                            for ci in range(len(ch)): pdf.set_xy(xh,ty); pdf.cell(cw[ci],th,ch[ci],0,0,'C',True); xh+=cw[ci]
+                            ry=ty+th; rh=5; mr=int((ph-ry-14)/rh)
+                            for ri,r in enumerate(reportes):
+                                if ri>0 and ri%mr==0:
+                                    pdf.add_page(); ry=10; xh=mx; pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',7)
+                                    for ci in range(len(ch)): pdf.set_xy(xh,ry); pdf.cell(cw[ci],th,ch[ci],0,0,'C',True); xh+=cw[ci]
+                                    ry+=th
+                                pdf.set_fill_color(253,254,255)if ri%2==0 else pdf.set_fill_color(246,250,254)
+                                pend=r.ofrenda_recibida in("Pendiente",""); ov=float(r.ofrenda_total or 0)
+                                vs=[pdf_safe(r.codigo or'-')[:12],pdf_safe(r.lider or'-')[:28],str(r.fecha)[:10]if r.fecha else'-','D'+pdf_safe(str(r.distrito or'?'))+' Z'+pdf_safe(str(r.zona or'?')),str(r.asistencia or 0),'Q'+f'{ov:,.0f}',str(r.hnos or 0),str(r.amigos or 0),str(r.ninos or 0),'']
+                                cv=mx
+                                for vi in range(len(cd)):
+                                    if vi==9:
+                                        if pend: pdf.set_fill_color(254,238,238); pdf.set_draw_color(230,190,190); pdf.set_text_color(190,30,30); et='Pendiente'
+                                        else: pdf.set_fill_color(233,251,240); pdf.set_draw_color(170,220,195); pdf.set_text_color(5,140,95); et='Recibida'
+                                        pdf.set_font('Helvetica','B',6.5); pdf.rect(cv+1.5,ry,cw[vi]-3,rh,'DF'); pdf.set_xy(cv,ry); pdf.cell(cw[vi],rh,et,0,0,'C')
+                                    else: pdf.set_text_color(45,55,70); pdf.set_font('Helvetica','',7); pdf.set_xy(cv,ry); pdf.cell(cw[vi],rh,vs[vi],0,0,ca[vi],True)
+                                    cv+=cw[vi]
+                                ry+=rh
+                            pdf.set_y(ry+3); pdf.set_draw_color(180,195,215); pdf.set_line_width(0.4); pdf.line(mx,pdf.get_y(),pw-mx,pdf.get_y())
+                            pdf.set_font('Helvetica','B',7); pdf.set_text_color(26,58,92); pdf.set_xy(mx,pdf.get_y()+2); pdf.cell(rw*0.5,5,f'{total_grupos} rep  |  Q{total_ofrenda:,.2f}',0,0,'L')
+                            df=datetime.now().strftime('%d/%m/%Y %I:%M %p'); pdf.set_font('Helvetica','',6); pdf.set_text_color(130,140,155)
+                            pdf.set_xy(mx,pdf.get_y()+6); pdf.cell(rw,4,f'{df}  |  redilrestauracion.totalappgt.online',0,0,'R')
+                            pdf_b64_fb=base64.b64encode(pdf.output()).decode()
+                            gr.pdf_data=pdf_b64_fb; gr.archivo_generado=f"/api/pdf/{no_serie}"; db.commit()
+                            result["pdfUrl"]=f"/api/pdf/{no_serie}"; result["pdfStatus"]="PDF listo (fpdf)"
+                        except Exception as e2:
+                            result["pdfError"]=str(e2); print(f"PDF fallo total ({no_serie}): {e2}")
                 except: pass
             return result
 
