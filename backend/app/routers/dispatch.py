@@ -1597,7 +1597,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 return res
             if not numero or not msg_construido:
                 return {"ok": False, "msg": "Numero y mensaje requeridos"}
-            resp = send_whatsapp_template(numero, params=["Iglesia Restauracion", msg_construido])
+            # Template no soporta saltos de linea, usar separador
+            msg_wa_tpl = msg_construido.replace("\n", "  ·  ")
+            resp = send_whatsapp_template(numero, params=["Iglesia Restauracion", msg_wa_tpl])
             db.add(NotificacionLog(
                 notificacion_id=0, titulo=titulo, destino=numero, canal="whatsapp",
                 wamid=resp.get("wamid", ""),
