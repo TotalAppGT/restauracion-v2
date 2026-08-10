@@ -10,6 +10,10 @@ import os
 # Crear tablas en BD
 Base.metadata.create_all(bind=engine)
 
+import os
+def _get_system_url():
+    return os.getenv("SISTEMA_URL", "https://redilrestauracion.totalappgt.online").rstrip("/")
+
 # Migración: agregar columnas nuevas si no existen
 try:
     from sqlalchemy import inspect, text
@@ -258,6 +262,7 @@ def _construir_html_notificacion(n, cuerpo_texto, church_name="Iglesia Restaurac
     titulo = esc_html(n.titulo or "Notificacion")
     cuerpo = esc_html(cuerpo_texto or "").replace("\n", "<br>")
     cn = esc_html(church_name or "Iglesia Restauracion")
+    sys_url = _get_system_url()
     return f"""
     <div style="font-family:Arial,Helvetica,sans-serif;max-width:600px;margin:0 auto;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden">
       <div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:24px 28px">
@@ -268,7 +273,7 @@ def _construir_html_notificacion(n, cuerpo_texto, church_name="Iglesia Restaurac
         <h2 style="margin:0 0 16px;color:#1a3a5c;font-size:18px">{titulo}</h2>
         <div style="background:#f8fafc;border:1px solid #eef0f5;border-radius:8px;padding:18px;color:#374151;line-height:1.55;font-size:14px;white-space:pre-line">{cuerpo}</div>
         <div style="margin-top:24px;padding-top:16px;border-top:1px solid #eef0f5;font-size:12px;color:#9ca3af;text-align:center">
-          {cn} &middot; <a href="https://redilrestauracion.totalappgt.online" style="color:#2563a8">redilrestauracion.totalappgt.online</a>
+          {cn} &middot; <a href="{sys_url}" style="color:#2563a8">{sys_url.replace("https://","")}</a>
         </div>
       </div>
     </div>"""

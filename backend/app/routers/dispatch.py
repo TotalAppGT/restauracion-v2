@@ -41,6 +41,21 @@ def _get_church_name(db):
     except: pass
     return "Iglesia Restauracion"
 
+def _get_system_url(db=None):
+    """Obtiene la URL del sistema desde config o env, con fallback."""
+    try:
+        import os
+        url = os.getenv("SISTEMA_URL", "")
+        if url: return url.rstrip("/")
+    except: pass
+    try:
+        if db:
+            from app.models import Configuracion
+            c = db.query(Configuracion).filter(Configuracion.clave == "system_url").first()
+            if c and c.valor: return c.valor.rstrip("/")
+    except: pass
+    return "https://redilrestauracion.totalappgt.online"
+
 def _formatear_whatsapp(msg, pdf_url=""):
     sep = " | "
     from datetime import datetime
@@ -133,7 +148,8 @@ def _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_e
     if info_extra and tipo not in ("reporte", "alerta", "ofrenda"):
         lineas.append(info_extra)
 
-    lineas.append("\U0001f517 Ingresa al sistema: redilrestauracion.totalappgt.online")
+    sys_url = _get_system_url()
+    lineas.append(f"\U0001f517 Ingresa al sistema: {sys_url}")
     return "\n".join(lineas)
 
 ALL_MENU_IDS = [
@@ -728,7 +744,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         # ── FORM URL ──
         if action == "getFormUrl":
             c = db.query(Configuracion).filter(Configuracion.clave == "formUrlPublic").first()
-            url = c.valor if c else "https://redilrestauracion.totalappgt.online/formulario_digital.html"
+            url = c.valor if c else f"{_get_system_url()}/formulario_digital.html"
             return {"ok": True, "url": url}
 
         if action == "getFormHtml":
@@ -1345,7 +1361,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         pdf.set_font('Helvetica','B',7); pdf.set_text_color(26,58,92)
                         pdf.set_xy(mx,pdf.get_y()+2); pdf.cell(rw*0.5,5,f'{total_grupos} reportes  |  Q{total_ofrenda:,.2f}  |  {df2}',0,0,'L')
                         pdf.set_font('Helvetica','',6); pdf.set_text_color(130,140,155)
-                        pdf.set_xy(mx,pdf.get_y()+6); pdf.cell(rw,4,f'Sistema REDIL  |  redilrestauracion.totalappgt.online',0,0,'R')
+                        sys_url2 = _get_system_url(db)
+                        pdf.set_xy(mx,pdf.get_y()+6); pdf.cell(rw,4,f'Sistema REDIL  |  {sys_url2}',0,0,'R')
                         pdf_b64=base64.b64encode(pdf.output()).decode()
                         gr.pdf_data=pdf_b64; gr.archivo_generado=f"/api/pdf/{no_serie}"; db.commit()
                         result["pdfUrl"]=f"/api/pdf/{no_serie}"; result["pdfStatus"]="PDF listo"
