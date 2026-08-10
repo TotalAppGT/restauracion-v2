@@ -32,6 +32,15 @@ def _htmlesc(s):
     """Escape HTML entities. Separada de esc() para evitar conflicto con variable local en dispatch()."""
     return str(s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 
+def _get_church_name(db):
+    """Obtiene el nombre de la iglesia desde config, con fallback."""
+    try:
+        from app.models import Configuracion
+        c = db.query(Configuracion).filter(Configuracion.clave == "nombre").first()
+        if c and c.valor: return c.valor
+    except: pass
+    return "Iglesia Restauracion"
+
 def _formatear_whatsapp(msg, pdf_url=""):
     sep = " | "
     from datetime import datetime
@@ -758,7 +767,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             lideres = db.query(Hermano).filter(Hermano.codigo_lead != None).all()
             reportes_q = db.query(Reporte)
             if fecha:
-                reportes_q = reportes_q.filter(Reporte.fecha == fecha)
+                try:
+                    d = datetime.strptime(fecha, "%Y-%m-%d").date()
+                    ini = d - timedelta(days=d.weekday())  # Lunes
+                    fin = ini + timedelta(days=6)  # Domingo
+                    reportes_q = reportes_q.filter(Reporte.fecha >= ini, Reporte.fecha <= fin)
+                except:
+                    reportes_q = reportes_q.filter(Reporte.fecha == fecha)
             reportes = reportes_q.all()
             codigos_reportados = set(r.codigo for r in reportes)
             data, total_lideres, entregaron, pendientes_c, ofrenda_total = [], 0, 0, 0, 0.0
@@ -1356,7 +1371,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 result = send_whatsapp_bulk(nums, msg) if len(nums) > 1 else send_whatsapp(nums[0], msg)
             else:
                 texto_wa = _formatear_whatsapp(msg)
-                results = [send_whatsapp_template(n, params=["Iglesia Restauracion", texto_wa]) for n in nums]
+                cn = _get_church_name(db)
+                results = [send_whatsapp_template(n, params=[cn, texto_wa]) for n in nums]
                 ok_count = sum(1 for r in results if r.get("ok"))
                 result = {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(nums)} contactos"}
             return result
@@ -1377,7 +1393,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if forzar:
                 return send_whatsapp_bulk(numbers, msg, pdf_url if pdf_url else None)
             texto_wa = _formatear_whatsapp(msg, pdf_url)
-            results = [send_whatsapp_template(n, params=["Iglesia Restauracion", texto_wa]) for n in numbers]
+            cn = _get_church_name(db)
+            results = [send_whatsapp_template(n, params=[cn, texto_wa]) for n in numbers]
             ok_count = sum(1 for r in results if r.get("ok"))
             return {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(numbers)} contactos"}
 
@@ -1493,11 +1510,12 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 if not email or not msg_construido:
                     return {"ok": False, "msg": "Correo y mensaje requeridos"}
                 try:
+                    cn_email = _get_church_name(db)
                     lineas_html = "".join(f'<div style="margin-bottom:8px">{_htmlesc(l)}</div>' for l in msg_construido.split("\n"))
                     html = '<div style="font-family:sans-serif;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;max-width:520px">'
-                    html += '<div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:20px"><b style="font-size:18px">Iglesia Restauracion</b><div style="font-size:13px;opacity:.9">Restaurando vidas y familias</div></div>'
+                    html += '<div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:20px"><b style="font-size:18px">'+_htmlesc(cn_email)+'</b><div style="font-size:13px;opacity:.9">Restaurando vidas y familias</div></div>'
                     html += '<div style="padding:22px">'+lineas_html+'</div></div>'
-                    send_email([email], f"Iglesia Restauracion - {titulo or 'Notificacion'}", html)
+                    send_email([email], f"{cn_email} - {titulo or 'Notificacion'}", html)
                     estado = "enviado"
                     destino = email
                     res = {"ok": True, "msg": "Enviado", "canal": "correo"}
@@ -1515,7 +1533,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 return {"ok": False, "msg": "Numero y mensaje requeridos"}
             # Template no soporta saltos de linea, usar separador
             msg_wa_tpl = msg_construido.replace("\n", "  ·  ")
-            resp = send_whatsapp_template(numero, params=["Iglesia Restauracion", msg_wa_tpl])
+            cn = _get_church_name(db)
+            resp = send_whatsapp_template(numero, params=[cn, msg_wa_tpl])
             db.add(NotificacionLog(
                 notificacion_id=0, titulo=titulo, destino=numero, canal="whatsapp",
                 wamid=resp.get("wamid", ""),
