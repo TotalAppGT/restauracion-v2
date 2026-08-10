@@ -418,44 +418,44 @@ let _dashData=null;
 function renderDashboard(el){
   el.innerHTML=`
   <div class="mod-hdr">
-    <h2><i class="fas fa-tachometer-alt"></i> Dashboard General</h2>
+    <h2><i class="fas fa-tachometer-alt"></i> Dashboard</h2>
     <div class="mod-acts">
-      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-        <select id="dashRango" class="fsl" style="min-width:120px" onchange="recargarDash()">
-          <option value="hoy">Hoy</option>
-          <option value="semana">Esta Semana</option>
-          <option value="mes" selected>Este Mes</option>
-          <option value="trimestre">Trimestre</option>
-        </select>
-        <button class="btn btn-ol btn-sm" onclick="imprimirDash()"><i class="fas fa-print"></i> Imprimir</button>
-        <button class="btn btn-ol btn-sm" onclick="recargarDash()"><i class="fas fa-sync"></i></button>
-      </div>
+      <select id="dashRango" class="fsl" style="min-width:110px" onchange="recargarDash()">
+        <option value="hoy">Hoy</option>
+        <option value="semana">Esta Semana</option>
+        <option value="mes" selected>Este Mes</option>
+        <option value="trimestre">Trimestre</option>
+      </select>
+      <button class="btn btn-ol btn-sm" onclick="imprimirDash()"><i class="fas fa-print"></i></button>
+      <button class="btn btn-ol btn-sm" onclick="recargarDash()"><i class="fas fa-sync"></i></button>
     </div>
   </div>
-  <!-- KPIs -->
-  <div class="sg" id="dashStats">${Array(9).fill('<div class="sc"><div class="g-spinner" style="width:18px;height:18px;border-width:3px"></div></div>').join('')}</div>
-  <!-- GRÁFICAS -->
-  <div class="dg" style="grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px" id="dashRow1">
+  <!-- KPIs compactos responsive -->
+  <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px" id="dashStats">
+    ${Array(6).fill('<div class="sc" style="min-height:70px"><div class="g-spinner" style="width:18px;height:18px;border-width:3px"></div></div>').join('')}
+  </div>
+  <!-- Acceso rapido -->
+  <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;margin-bottom:14px" id="dashQuickActions">
+    <button class="btn btn-pr btn-sm" onclick="nav('reportes',true)" style="padding:8px"><i class="fas fa-file-alt"></i> Reportes</button>
+    <button class="btn btn-ac btn-sm" onclick="nav('generador',true)" style="padding:8px;background:#7d3c98;border:none"><i class="fas fa-file-invoice"></i> Generador</button>
+    <button class="btn btn-in btn-sm" onclick="nav('envio',true)" style="padding:8px"><i class="fas fa-paper-plane"></i> Envios</button>
+    <button class="btn btn-wa btn-sm" onclick="nav('notificaciones',true)" style="padding:8px"><i class="fas fa-bell"></i> Notificaciones</button>
+    <button class="btn btn-ok btn-sm" onclick="nav('cuadre',true);reporteModPrevio='reportes'" style="padding:8px"><i class="fas fa-calculator"></i> Cuadre</button>
+    <button class="btn btn-ol btn-sm" onclick="nav('formulario',true)" style="padding:8px"><i class="fas fa-mobile-alt"></i> Formulario</button>
+  </div>
+  <!-- GRAFICAS responsive -->
+  <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px;margin-bottom:14px" id="dashRow1">
     <div class="dc" id="dc_asist"><div class="dct dct-o"><i class="fas fa-chart-bar"></i> Asistencia &amp; Ofrendas <span id="dashRangoLbl" style="font-size:10px;color:var(--tx3);margin-left:6px"></span></div><div class="chart-area"><canvas id="chAsist"></canvas></div></div>
-    <div class="dc" id="dc_grupos"><div class="dct dct-g"><i class="fas fa-layer-group"></i> Grupos vs Meta <button class="btn btn-ol btn-sm" style="margin-left:auto;font-size:10px;padding:3px 8px" onclick="imprimirGrafica('chGrupos','Grupos vs Meta')"><i class="fas fa-print"></i></button></div><div class="chart-area"><canvas id="chGrupos"></canvas></div></div>
+    <div class="dc" id="dc_grupos"><div class="dct dct-g"><i class="fas fa-layer-group"></i> Grupos vs Meta</div><div class="chart-area"><canvas id="chGrupos"></canvas></div></div>
   </div>
-  <div class="dg" style="grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px" id="dashRow2">
+  <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:14px" id="dashRow2">
     <div class="dc" id="dc_conv"><div class="dct dct-p"><i class="fas fa-heart"></i> Convertidos &amp; Reconciliados</div><div class="chart-area"><canvas id="chConv"></canvas></div></div>
-    <div class="dc" id="dc_tipo"><div class="dct dct-i"><i class="fas fa-mobile-alt"></i> Manuales vs Digitales</div><div class="chart-area"><canvas id="chTipo"></canvas></div></div>
-    <div class="dc" id="dc_seg"><div class="dct dct-t"><i class="fas fa-tasks"></i> Seguimientos</div><div class="chart-area" style="min-height:180px"><canvas id="chSeg"></canvas></div></div>
-  </div>
-  <div class="dg" style="grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px" id="dashRow3">
+    <div class="dc" id="dc_tipo"><div class="dct dct-i"><i class="fas fa-mobile-alt"></i> Digital vs Manual</div><div class="chart-area"><canvas id="chTipo"></canvas></div></div>
     <div class="dc" id="dc_distAsist"><div class="dct dct-o"><i class="fas fa-map-marker-alt"></i> Asistencia por Distrito</div><div class="chart-area"><canvas id="chDistAsist"></canvas></div></div>
-    <div class="dc" id="dc_distHnos"><div class="dct dct-g"><i class="fas fa-users"></i> Hermanos por Distrito</div><div class="chart-area"><canvas id="chDistHnos"></canvas></div></div>
-    <div class="dc" id="dc_reuniones"><div class="dct dct-p"><i class="fas fa-church"></i> Tipo de Reunión</div><div class="chart-area"><canvas id="chReuniones"></canvas></div></div>
   </div>
-  <div class="dg" style="grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:14px" id="dashRow4">
-    <div class="dc" id="dc_stock"><div class="dct dct-r"><i class="fas fa-exclamation-triangle"></i> Stock Bajo</div><div id="dashStock"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
-  </div>
-  <div class="dg" style="grid-template-columns:1fr 1fr 1fr;gap:14px">
-    <div class="dc"><div class="dct dct-p"><i class="fas fa-clock"></i> Últimos Reportes</div><div id="dashRec"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
-    <div class="dc"><div class="dct dct-i"><i class="fas fa-hands-helping"></i> Últimos Seguimientos</div><div id="dashSeg"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
-    <div class="dc"><div class="dct dct-t"><i class="fas fa-calendar-alt"></i> Cronogramas <button class="btn btn-ol btn-sm" style="margin-left:auto;font-size:10px;padding:3px 8px" onclick="nav('privilegios');setTimeout(function(){switchPrvTab('cron');},400)"><i class="fas fa-external-link-alt"></i></button></div><div id="dashCron"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
+  <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px">
+    <div class="dc"><div class="dct dct-p"><i class="fas fa-clock"></i> Ultimos Reportes</div><div id="dashRec" style="max-height:200px;overflow-y:auto"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
+    <div class="dc"><div class="dct dct-i"><i class="fas fa-hands-helping"></i> Ultimos Seguimientos</div><div id="dashSeg" style="max-height:200px;overflow-y:auto"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
   </div>`;
   recargarDash();
 }
