@@ -710,6 +710,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if exist and (not item_id or int(exist.id) != int(item_id)):
                 return {"ok": False, "msg": "Ya existe un usuario con el email: " + email}
             data = payload_to_kwargs(USUARIO_MAP, payload)
+            if not item_id:
+                data.pop("id", None)  # Remover ID vacio para nuevos
             # Normalizar rol a minúscula
             if "rol" in data and data["rol"]:
                 data["rol"] = str(data["rol"]).lower().strip()
