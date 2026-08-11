@@ -1546,7 +1546,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         # ── NOTIFICACIONES ──
         if action == "getNotificaciones":
-            from app.models import Notificacion
             rows = db.query(Notificacion).order_by(Notificacion.timestamp.desc()).all()
             return {"ok": True, "data": [
                 {"id": n.id, "titulo": n.titulo, "mensaje": n.mensaje,
@@ -1563,7 +1562,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             ]}
 
         if action == "saveNotificacion":
-            from app.models import Notificacion
             nid = payload.get("id")
             titulo = payload.get("titulo", "")
             mensaje = payload.get("mensaje", "")
@@ -1613,7 +1611,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return {"ok": True, "msg": "Notificacion guardada"}
 
         if action == "deleteNotificacion":
-            from app.models import Notificacion
             nid = payload.get("id")
             if not nid:
                 return {"ok": False, "msg": "ID requerido"}
@@ -1685,7 +1682,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return resp
 
         if action == "getNotificacionesLog":
-            from app.models import NotificacionLog
             rows = db.query(NotificacionLog).order_by(NotificacionLog.fecha.desc()).limit(200).all()
             return {"ok": True, "data": [
                 {"id": r.id, "notificacion_id": r.notificacion_id,
