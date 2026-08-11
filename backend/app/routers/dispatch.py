@@ -245,7 +245,9 @@ def save_entity(db, model_class, field_map, payload, id_key="ID"):
     item_id = payload.get(id_key)
     data = payload_to_kwargs(field_map, payload)
     if not item_id:
-        data.pop("id", None)  # Evitar error de ID vacio en PostgreSQL
+        data.pop("id", None)
+    # Quitar campos con valor vacio del update (evita error en numericos)
+    data = {k: v for k, v in data.items() if not (isinstance(v, str) and v.strip() == "")}
     if item_id:
         obj = db.query(model_class).filter(model_class.id == item_id).first()
         if not obj:
