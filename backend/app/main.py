@@ -106,6 +106,22 @@ try:
             conn.commit()
         except Exception:
             pass
+        # Asegurar tabla bitacora
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS bitacora (
+                    id SERIAL PRIMARY KEY,
+                    fecha TIMESTAMP DEFAULT NOW(),
+                    usuario VARCHAR(200),
+                    email VARCHAR(200),
+                    rol VARCHAR(50),
+                    accion VARCHAR(200),
+                    detalle TEXT
+                )
+            """))
+            conn.commit()
+        except Exception:
+            pass
         conn.commit()
 except Exception as e:
     print(f"⚠️ Migración: {e}")
