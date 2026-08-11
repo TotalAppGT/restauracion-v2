@@ -779,7 +779,21 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         # ── BITACORA (raw array) ──
         if action == "getBitacora":
             from sqlalchemy import text
-            rows = db.execute(text("SELECT id, fecha, usuario, email, rol, accion, detalle FROM bitacora ORDER BY fecha DESC LIMIT 500")).fetchall()
+            sql = "SELECT id, fecha, usuario, email, rol, accion, detalle FROM bitacora"
+            params = {}
+            if payload.get("desde"):
+                sql += " AND fecha >= :desde"
+                params["desde"] = payload["desde"]
+            if payload.get("hasta"):
+                sql += " AND fecha <= :hasta"
+                params["hasta"] = payload["hasta"]
+            if payload.get("rol"):
+                sql += " AND rol = :rol"
+                params["rol"] = payload["rol"]
+            sql = sql.replace(" WHERE AND ", " WHERE ", 1) if " WHERE AND " in sql else sql
+            if "WHERE" not in sql: sql += " WHERE 1=1"
+            sql += " ORDER BY fecha DESC LIMIT 500"
+            rows = db.execute(text(sql), params).fetchall()
             return [{"ID": r[0], "FechaHora": str(r[1]) if r[1] else "", "Usuario": r[2] or "", "Email": r[3] or "", "Rol": r[4] or "", "Accion": r[5] or "", "Detalles": r[6] or ""} for r in rows]
 
         if action == "limpiarBitacora":
