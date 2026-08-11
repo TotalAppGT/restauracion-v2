@@ -2743,7 +2743,7 @@ function renderEnvio(el){
       <div class="ct"><i class="fab fa-whatsapp" style="color:#25D366"></i> Enviar por WhatsApp</div>
       <div style="display:flex;flex-direction:column;gap:8px">
         <div class="fgg"><label>Mensaje</label><textarea class="fc" id="wa_mensaje" rows="3">📊 *${appNom}*\n\nInforme de reportes adjunto.\n_Dios le bendiga._</textarea></div>
-        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--tx2);cursor:pointer"><input type="checkbox" id="wa_usar_plantilla" checked style="width:16px;height:16px;cursor:pointer"> Enviar como documento adjunto</label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--tx2);cursor:pointer"><input type="checkbox" id="wa_usar_plantilla" checked style="width:16px;height:16px;cursor:pointer"> Usar plantilla (solo texto, sin PDF)</label>
         <div style="font-size:11px;font-weight:700;color:var(--tx2)"><i class="fab fa-whatsapp"></i> Destinatarios</div>
         <div id="wa_dest_tags" style="background:var(--bg3);border-radius:8px;padding:8px;min-height:36px;border:1.5px solid var(--brd);display:flex;flex-wrap:wrap;gap:5px;cursor:text" onclick="document.getElementById('wa_dest_input').focus()">
           <input type="text" id="wa_dest_input" placeholder="Número + Enter (8 dígitos = +502)" style="border:none;background:transparent;outline:none;font-size:12px;flex:1;min-width:110px" onkeydown="addWaTag(event)">

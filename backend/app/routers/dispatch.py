@@ -1458,20 +1458,22 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             numbers = payload.get("numeros", [])
             msg = payload.get("mensaje", "")
             pdf_url = payload.get("pdfUrl", "")
-            forzar_texto_raw = payload.get("usarPlantilla") == False
+            usar_plantilla = payload.get("usarPlantilla") == True
             if not numbers or not msg:
                 return {"ok": False, "msg": "Números y mensaje requeridos"}
-            # Si hay PDF, SIEMPRE enviar como documento (la plantilla no soporta adjuntos)
-            forzar = forzar_texto_raw or bool(pdf_url and pdf_url.strip())
-            # Normalizar numeros: 8 digitos -> 502XXXXXXXX
+            # Normalizar numeros
             numbers = [("502"+n if len(str(n).replace("+","").replace(" ",""))==8 and not str(n).startswith("+") and not str(n).startswith("502") else str(n)) for n in numbers]
-            if forzar:
-                return send_whatsapp_bulk(numbers, msg, pdf_url if pdf_url else None)
-            texto_wa = _formatear_whatsapp(msg, pdf_url)
-            cn = _get_church_name(db)
-            results = [send_whatsapp_template(n, params=[cn, texto_wa]) for n in numbers]
-            ok_count = sum(1 for r in results if r.get("ok"))
-            return {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(numbers)} contactos"}
+            # Si hay PDF, SIEMPRE enviar como documento
+            if pdf_url and pdf_url.strip():
+                return send_whatsapp_bulk(numbers, msg, pdf_url)
+            # Sin PDF: usar template si el checkbox esta marcado
+            if usar_plantilla:
+                cn = _get_church_name(db)
+                texto_wa = _formatear_whatsapp(msg)
+                results = [send_whatsapp_template(n, params=[cn, texto_wa]) for n in numbers]
+                ok_count = sum(1 for r in results if r.get("ok"))
+                return {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(numbers)} contactos"}
+            return send_whatsapp_bulk(numbers, msg)
 
         # ── RECURRENTE (PAGOS) ──
         if action == "getPlanes":
