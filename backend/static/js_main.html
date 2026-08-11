@@ -1738,6 +1738,7 @@ function loadRepo(){
         +'<div style="display:flex;gap:4px">'
         +(hasPdf?'<a href="'+esc(r['Archivo Generado'])+'" target="_blank" class="ab-btn" style="background:rgba(39,174,96,.1);color:var(--ok);font-size:10px;padding:4px 7px" onclick="event.stopPropagation()"><i class="fas fa-external-link-alt"></i></a>':'')
         +'<button class="ab-btn ab-pr" style="font-size:10px;padding:4px 7px" onclick="event.stopPropagation();clickRepoPrint(this)"><i class="fas fa-print"></i></button>'
+        +'<button class="ab-btn ab-del" style="font-size:10px;padding:4px 7px" onclick="event.stopPropagation();delRepoItem(\''+esc(r['No Serie'])+'\')"><i class="fas fa-trash"></i></button>'
         +'</div>'
         +'</div>';
     }).join('');

@@ -350,13 +350,33 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         # ── DASHBOARD ──
         if action == "getDashboard":
+            # Determinar rango de fechas
+            rango = payload.get("rango","mes")
+            hoy = date.today()
+            if rango == "hoy":
+                desde = hoy; hasta = hoy
+            elif rango == "semana":
+                desde = hoy - timedelta(days=hoy.weekday())  # Lunes
+                hasta = desde + timedelta(days=6)  # Domingo
+            elif rango == "mes":
+                desde = hoy.replace(day=1)
+                # Ultimo dia del mes
+                if hoy.month == 12: hasta = hoy.replace(year=hoy.year+1, month=1, day=1) - timedelta(days=1)
+                else: hasta = hoy.replace(month=hoy.month+1, day=1) - timedelta(days=1)
+            else:  # trimestre
+                q_inicio = ((hoy.month - 1) // 3) * 3 + 1
+                desde = hoy.replace(month=q_inicio, day=1)
+                if q_inicio + 3 > 12: hasta = hoy.replace(year=hoy.year+1, month=1, day=1) - timedelta(days=1)
+                else: hasta = hoy.replace(month=q_inicio+3, day=1) - timedelta(days=1)
+            
+            reportes_filtrados = db.query(Reporte).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta)
             lideres = db.query(Hermano).filter(Hermano.codigo_lead != None).count()
-            reportes_mes = db.query(Reporte).count()
-            pendientes = db.query(Reporte).filter(Reporte.ofrenda_recibida.in_(["Pendiente", ""])).count()
-            asistencia_total = db.query(func.coalesce(func.sum(Reporte.asistencia), 0)).scalar()
-            of_total = float(db.query(func.coalesce(func.sum(Reporte.ofrenda_total), 0)).scalar())
-            seg_total = db.query(Seguimiento).count()
-            return {"ok": True, "lideres": lideres, "reportesMes": reportes_mes, "gruposRealizados": reportes_mes, "asistencia": int(asistencia_total), "ofTotal": round(of_total, 2), "convertidos": 0, "reconciliados": 0, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": []}
+            reportes_count = reportes_filtrados.count()
+            pendientes = reportes_filtrados.filter(Reporte.ofrenda_recibida.in_(["Pendiente", ""])).count()
+            asistencia_total = db.query(func.coalesce(func.sum(Reporte.asistencia), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar()
+            of_total = float(db.query(func.coalesce(func.sum(Reporte.ofrenda_total), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar())
+            seg_total = db.query(Seguimiento).filter(Seguimiento.fecha >= desde, Seguimiento.fecha <= hasta).count()
+            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "asistencia": int(asistencia_total or 0), "ofTotal": round(of_total or 0, 2), "convertidos": 0, "reconciliados": 0, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": [], "rango": rango, "desde": str(desde), "hasta": str(hasta)}
 
         # ── HERMANOS (returns RAW ARRAY, matching GAS) ──
         if action == "getHermanos":
@@ -1342,61 +1362,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     db.add(gr)
                     db.commit()
                     try:
-                        from fpdf import FPDF
-                        pdf = FPDF('L','mm','Letter'); pdf.set_auto_page_break(True,8)
-                        pdf.add_page()
-                        pw=pdf.w; ph=pdf.h; mx=10; rw=pw-20
-                        pdf.set_fill_color(26,58,92); pdf.rect(0,0,pw,22,'F')
-                        pdf.set_fill_color(18,48,78); pdf.rect(0,0,pw,2,'F')
-                        pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',15)
-                        pdf.set_xy(mx,3); pdf.cell(rw*0.55,7,pdf_safe(sys_nom or'Iglesia Restauracion')[:35],0,0,'L')
-                        pdf.set_font('Helvetica','',7.5); pdf.set_text_color(190,210,230)
-                        df2=datetime.now().strftime('%d/%m/%Y %I:%M %p')
-                        pdf.set_xy(mx,12); pdf.cell(rw*0.55,4,f'{pdf_safe(tipo)[:45]}  |  {rango_str}  |  {df2}',0,0,'L')
-                        bx2=pw-mx-56; by2=3
-                        pdf.set_fill_color(255,255,255); pdf.rect(bx2,by2,56,15,'F')
-                        pdf.set_draw_color(60,120,180); pdf.set_line_width(0.4); pdf.rect(bx2,by2,56,15,'D')
-                        pdf.set_text_color(26,58,92); pdf.set_font('Helvetica','B',10)
-                        pdf.set_xy(bx2,by2+1); pdf.cell(56,7,no_serie,0,0,'C')
-                        pdf.set_font('Helvetica','',6.5); pdf.set_text_color(100,120,140)
-                        pdf.set_xy(bx2,by2+8); pdf.cell(56,4,f'{total_grupos} rep | Q{total_ofrenda:,.0f}',0,0,'C')
-                        kpi=[(str(total_grupos),'REPORTES',(99,102,241)),(str(total_asist),'ASISTENCIA',(16,185,129)),(f'Q{total_ofrenda:,.0f}','OFRENDA',(239,68,68)),(f'{estado_pct}%','RECIBIDAS',(59,130,246)),(str(total_pendientes),'PENDIENTES',(249,115,22)),(str(total_hnos),'HNOS',(139,92,246)),(str(total_amigos),'AMIGOS',(20,184,166)),(str(total_ninos),'NINOS',(245,158,11))]
-                        kw=(rw-7*4)/8; kh=15; ky=26
-                        for i,(v,l,(cr,cg,cb)) in enumerate(kpi):
-                            kx=mx+i*(kw+4); pdf.set_fill_color(248,251,255); pdf.set_draw_color(215,225,240); pdf.rect(kx,ky,kw,kh,'DF')
-                            pdf.set_fill_color(cr,cg,cb); pdf.rect(kx,ky,2.5,kh,'F')
-                            pdf.set_text_color(cr,cg,cb); pdf.set_font('Helvetica','B',11); pdf.set_xy(kx+4,ky+1); pdf.cell(kw-6,7,v,0,0,'L')
-                            pdf.set_font('Helvetica','',5.5); pdf.set_text_color(120,130,145); pdf.set_xy(kx+4,ky+10); pdf.cell(kw-6,4,l,0,0,'L')
-                        cd=[('Codigo',15,'L'),('Lider',38,'L'),('Fecha',18,'C'),('D-Z',17,'C'),('AGF',12,'C'),('Ofrenda',18,'C'),('Hnos',10,'C'),('Amigos',10,'C'),('Ninos',10,'C'),('Estado',22,'C')]
-                        cw=[c[1]for c in cd]; scale=rw/sum(cw); cw=[w*scale for w in cw]; chd=[c[0]for c in cd]; ca=[c[2]for c in cd]
-                        ty=ky+kh+8; th=6; pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',7)
-                        xh=mx
-                        for ci in range(len(chd)): pdf.set_xy(xh,ty); pdf.cell(cw[ci],th,chd[ci],0,0,'C',True); xh+=cw[ci]
-                        ry=ty+th; rh=5; mr=int((ph-ry-14)/rh)
-                        for ri,r in enumerate(reportes):
-                            if ri>0 and ri%mr==0:
-                                pdf.add_page(); ry=10; xh=mx; pdf.set_fill_color(26,58,92); pdf.set_text_color(255,255,255); pdf.set_font('Helvetica','B',7)
-                                for ci in range(len(chd)): pdf.set_xy(xh,ry); pdf.cell(cw[ci],th,chd[ci],0,0,'C',True); xh+=cw[ci]
-                                ry+=th
-                            pdf.set_fill_color(253,254,255)if ri%2==0 else pdf.set_fill_color(246,250,254)
-                            pend=r.ofrenda_recibida in("Pendiente",""); ov=float(r.ofrenda_total or 0)
-                            vs=[pdf_safe(r.codigo or'-')[:12],pdf_safe(r.lider or'-')[:28],str(r.fecha)[:10]if r.fecha else'-','D'+pdf_safe(str(r.distrito or'?'))+' Z'+pdf_safe(str(r.zona or'?')),str(r.asistencia or 0),'Q'+f'{ov:,.0f}',str(r.hnos or 0),str(r.amigos or 0),str(r.ninos or 0),'']
-                            cv=mx
-                            for vi in range(len(cd)):
-                                if vi==9:
-                                    if pend: pdf.set_fill_color(254,238,238); pdf.set_draw_color(230,190,190); pdf.set_text_color(190,30,30); et='Pendiente'
-                                    else: pdf.set_fill_color(233,251,240); pdf.set_draw_color(170,220,195); pdf.set_text_color(5,140,95); et='Recibida'
-                                    pdf.set_font('Helvetica','B',6.5); pdf.rect(cv+1.5,ry,cw[vi]-3,rh,'DF'); pdf.set_xy(cv,ry); pdf.cell(cw[vi],rh,et,0,0,'C')
-                                else: pdf.set_text_color(45,55,70); pdf.set_font('Helvetica','',7); pdf.set_xy(cv,ry); pdf.cell(cw[vi],rh,vs[vi],0,0,ca[vi],True)
-                                cv+=cw[vi]
-                            ry+=rh
-                        pdf.set_y(ry+3); pdf.set_draw_color(180,195,215); pdf.set_line_width(0.4); pdf.line(mx,pdf.get_y(),pw-mx,pdf.get_y())
-                        pdf.set_font('Helvetica','B',7); pdf.set_text_color(26,58,92)
-                        pdf.set_xy(mx,pdf.get_y()+2); pdf.cell(rw*0.5,5,f'{total_grupos} reportes  |  Q{total_ofrenda:,.2f}  |  {df2}',0,0,'L')
-                        pdf.set_font('Helvetica','',6); pdf.set_text_color(130,140,155)
-                        sys_url2 = _get_system_url(db)
-                        pdf.set_xy(mx,pdf.get_y()+6); pdf.cell(rw,4,f'Sistema REDIL  |  {sys_url2}',0,0,'R')
-                        pdf_b64=base64.b64encode(pdf.output()).decode()
+                        from weasyprint import HTML as WHTML
+                        pdf_bytes = WHTML(string=html).write_pdf()
+                        pdf_b64=base64.b64encode(pdf_bytes).decode()
                         gr.pdf_data=pdf_b64; gr.archivo_generado=f"/api/pdf/{no_serie}"; db.commit()
                         result["pdfUrl"]=f"/api/pdf/{no_serie}"; result["pdfStatus"]="PDF listo"
                     except Exception as e:
