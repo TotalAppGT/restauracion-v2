@@ -394,6 +394,15 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "deleteReporte":
             return delete_entity(db, Reporte, payload)
 
+        if action == "guardarOfrendaRecibida":
+            rpt_id = payload.get("id") or payload.get("ID")
+            if not rpt_id: return {"ok": False, "msg": "ID requerido"}
+            rpt = db.query(Reporte).filter(Reporte.id == int(rpt_id)).first()
+            if not rpt: return {"ok": False, "msg": "Reporte no encontrado"}
+            rpt.ofrenda_recibida = "Recibida"
+            db.commit()
+            return {"ok": True, "msg": "Ofrenda marcada como Recibida"}
+
         if action == "buscarLiderFormulario":
             query = payload.get("query", "")
             h = db.query(Hermano).filter(
