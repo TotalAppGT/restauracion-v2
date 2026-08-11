@@ -5,7 +5,8 @@ from app.models import (
     Usuario, Hermano, Reporte, Seguimiento,
     Supervisor, Pastore, AyudaPastor, Contacto,
     Diezmo, Gasto, Inventario, Insumo, Privilegio,
-    Cronograma, Bitacora, Configuracion, Envio, GeneradorReporte, Bautizo
+    Cronograma, Bitacora, Configuracion, Envio, GeneradorReporte, Bautizo,
+    Notificacion, NotificacionLog
 )
 import jwt
 import bcrypt
@@ -746,7 +747,12 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return {"ok": True}
 
         if action == "deleteNotificacionLog":
-            return delete_entity(db, NotificacionLog, payload)
+            nl_id = payload.get("id") or payload.get("ID")
+            if not nl_id: return {"ok": False, "msg": "ID requerido"}
+            obj = db.query(NotificacionLog).filter(NotificacionLog.id == int(nl_id)).first()
+            if not obj: return {"ok": False, "msg": "No encontrado"}
+            db.delete(obj); db.commit()
+            return {"ok": True}
 
         # ── USUARIOS (raw array) ──
         if action == "getUsuarios":
