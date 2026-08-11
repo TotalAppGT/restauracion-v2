@@ -3108,14 +3108,14 @@ function filterCnt(q){renderCntTb(_cnt.filter(c=>JSON.stringify(c).toLowerCase()
 function cntForm(c){c=c||{};return `<div class="fg2"><div class="fgg"><label>Nombre <span class="req">*</span></label><input class="fc" id="cf_n" value="${esc(c['Nombre']||'')}"></div><div class="fgg"><label>Correo</label><input class="fc" type="email" id="cf_c" value="${esc(c['Correo']||'')}"></div><div class="fgg"><label>WhatsApp</label><input class="fc" id="cf_w" value="${esc(c['WhatsApp']||c['Telefono']||'')}" placeholder="50212345678"></div></div>`;}
 function newCnt(){openModal('Nuevo Contacto',cntForm(),mFoot('saveCnt'));}
 function editCnt(id){
-  const c=_cnt.find(x=>String(x['IDContacto'])==String(id));
+  const c=_cnt.find(x=>String(x['ID'])==String(id));
   openModal(
     'Editar',
     cntForm(c),
     `<button class="btn btn-ol" onclick="closeModal()">Cancelar</button><button class="btn btn-pr" onclick="saveCnt('${esc(id)}')"><i class="fas fa-save"></i> Actualizar</button>`
   );
 }
-function saveCnt(id){const data={'IDContacto':id||'','Nombre':g('cf_n'),'Correo':g('cf_c'),'WhatsApp':g('cf_w')};if(!data['Nombre']){toast('Nombre requerido','wa');return;}loading(true);call('saveContacto',data,(_,res)=>{loading(false);if(res?.ok){toast('Guardado','ok');closeModal();loadCnt();}});}
+function saveCnt(id){const data={'IDContacto':id||null,'Nombre':g('cf_n'),'Correo':g('cf_c'),'WhatsApp':g('cf_w')};if(!data['Nombre']){toast('Nombre requerido','wa');return;}loading(true);call('saveContacto',data,(_,res)=>{loading(false);if(res?.ok){toast('Guardado','ok');closeModal();loadCnt();}});}
 function delCnt(id){customConfirm('¿Estás seguro de eliminar este contacto?',function(ok){if(ok){loading(true);call('deleteContacto',{ID:id},(_,res)=>{loading(false);if(res&&res.ok){toast('Eliminado','ok');loadCnt();}else{toast('Error al eliminar: '+(res&&res.msg||'Desconocido'),'er');}});}},{icon:'fa-trash-alt',color:'#e74c3c',danger:true});}
 function vaciarContactos(){customConfirm('¿Eliminar TODOS los contactos? Esta accion no se puede deshacer.',function(ok){if(ok){loading(true);call('deleteAllContactos',{},(_,res)=>{loading(false);if(res&&res.ok){toast(res.msg,'ok');loadCnt();recargarEnvio();}else{toast('Error: '+(res&&res.msg||''),'er');}});}},{icon:'fa-trash-alt',color:'#e74c3c',danger:true});}
 
