@@ -1980,8 +1980,25 @@ function genReporte(){
     prev.appendChild(bar);
     loadRepo();
     toast('Reporte generado — '+res.noSerie+' (generando PDF profesional...)','ok',4000);
-    // Auto-generar PDF profesional con html2pdf
-    setTimeout(function(){generarPDFCliente(res.noSerie);},1500);
+    // Auto-generar PDF profesional con html2pdf usando el HTML guardado
+    var serieGen=res.noSerie, htmlGen=res.html;
+    setTimeout(function(){
+      if(!htmlGen){toast('No se pudo generar PDF profesional','wa');return;}
+      loading(true);
+      try{
+        html2pdf().set({margin:[5,5,5,5],filename:serieGen+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,letterRendering:true},jsPDF:{unit:'mm',format:'letter',orientation:'landscape'}}).from(htmlGen).outputPdf('blob').then(function(blob){
+          var reader=new FileReader();
+          reader.onloadend=function(){
+            call('guardarPDF',{noSerie:serieGen,pdfBase64:reader.result},function(_,res2){
+              loading(false);
+              if(res2&&res2.ok){toast('PDF profesional listo para envio','ok',3000);loadRepo();}
+              else{toast('Error al guardar PDF profesional','wa');}
+            });
+          };
+          reader.readAsDataURL(blob);
+        }).catch(function(e){loading(false);console.log('html2pdf error:',e);});
+      }catch(e){loading(false);}
+    },2000);
   });
 }
 function guardarEnDrive(btn){
