@@ -895,8 +895,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         if cfg2: sys_nom = cfg2.valor
                     except: pass
                     today_str = dt2.now().strftime('%Y%m%d')
-                    count = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie.like(f'%cuadre_{today_str}%')).count() + 1
-                    no_serie = f"cuadre_{today_str}_{count:03d}"
+                    count = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie.like(f'%REST_cuadre_{today_str}%')).count() + 1
+                    no_serie = f"REST_cuadre_{today_str}_{count:03d}"
                     fecha_gen = dt2.now().strftime('%d/%m/%Y %I:%M %p')
                     pdf = FPDF('L','mm','Letter'); pdf.set_auto_page_break(True,10); pdf.add_page(); pdf.set_margin(10)
                     w=pdf.w-20; cx=10
@@ -1243,10 +1243,10 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 if cfg: sys_nom = cfg.valor
             except: pass
 
-            # Nomenclatura: redil_YYYYMMDD_correlativo
+            # Nomenclatura: REST_YYYYMMDD_correlativo
             today_str = datetime.now().strftime('%Y%m%d')
-            count = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie.like(f'%{today_str}%')).count() + 1
-            no_serie = f"redil_{today_str}_{count:03d}"
+            count = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie.like(f'%REST_{today_str}%')).count() + 1
+            no_serie = f"REST_{today_str}_{count:03d}"
             fecha_gen = datetime.now().strftime('%d/%m/%Y %I:%M %p')
             rango_str = f"{desde or 'Inicio'} -> {hasta or 'Hoy'}"
 
