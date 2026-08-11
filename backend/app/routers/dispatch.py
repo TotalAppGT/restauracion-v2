@@ -717,6 +717,17 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "deleteEnvio":
             return delete_entity(db, Envio, payload)
 
+        if action == "deleteGenerador":
+            ns = payload.get("No_Serie") or payload.get("id") or payload.get("ID")
+            if not ns: return {"ok": False, "msg": "No Serie requerido"}
+            obj = db.query(GeneradorReporte).filter(GeneradorReporte.no_serie == str(ns)).first()
+            if not obj: return {"ok": False, "msg": "No encontrado"}
+            db.delete(obj); db.commit()
+            return {"ok": True}
+
+        if action == "deleteNotificacionLog":
+            return delete_entity(db, NotificacionLog, payload)
+
         # ── USUARIOS (raw array) ──
         if action == "getUsuarios":
             return [{"ID": u.id, "Nombre": u.nombre, "Email": u.email, "Rol": u.rol, "Activo": "SI" if u.activo else "NO", "MenuPermitido": u.menu_permitido or "", "PuedeVerBitacora": "SI" if u.puede_ver_bitacora else "NO"} for u in db.query(Usuario).all()]

@@ -1477,7 +1477,8 @@ function viewRep(id){
   ];
   const segs=[[r['Nombre Persona'],r['Tipo de Seguimiento']],[r['Nombre Persona 2'],r['Tipo de Seguimiento 2']],[r['Nombre Persona 3'],r['Tipo de Seguimiento 3']],[r['Nombre Persona 4'],r['Tipo de Seguimiento 4']],[r['Nombre Persona 5'],r['Tipo de Seguimiento 5']],[r['Nombre Persona 6'],r['Tipo de Seguimiento 6']],[r['Nombre Persona 7'],r['Tipo de Seguimiento 7']],[r['Nombre Persona 8'],r['Tipo de Seguimiento 8']],[r['Nombre Persona 9'],r['Tipo de Seguimiento 9']],[r['Nombre Persona 10'],r['Tipo de Seguimiento 10']]].filter(s=>s[0]);
   openModal('Detalle del Reporte — '+esc(r['Lider']),
-  `<div style="max-height:72vh;overflow-y:auto;padding-right:4px">
+  `<style>@media print{body{font-size:9px}.modal-card{max-width:100%!important;width:100%!important;box-shadow:none!important;border:none!important}.modal-body{max-height:none!important;overflow:visible!important}[style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr 1fr!important}[style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:repeat(4,1fr)!important}.modal-ov{display:none!important}*{print-color-adjust:exact;-webkit-print-color-adjust:exact}}</style>
+  <div style="max-height:72vh;overflow-y:auto;padding-right:4px">
     ${isDigital?'<div style="background:rgba(37,99,168,.08);border-left:3px solid var(--pr2);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--pr2)"><i class="fas fa-mobile-alt"></i> <b>Reporte Digital</b> — enviado por el líder desde el formulario externo</div>':''}
     ${isPend?'<div style="background:rgba(231,76,60,.08);border-left:3px solid var(--err);border-radius:6px;padding:8px 12px;margin-bottom:12px;font-size:12px;color:var(--err)"><i class="fas fa-exclamation-triangle"></i> <b>Ofrenda pendiente</b> de entrega física</div>':''}
     <div class="sect-title" style="margin-bottom:8px"><i class="fas fa-info-circle"></i> Información General</div>
@@ -1745,6 +1746,9 @@ function loadRepo(){
 
 function clickRepo(el){
   previewRepoItem(el.dataset.serie,el.dataset.desde,el.dataset.hasta,el.dataset.lider,el.dataset.supsec,el.dataset.suparea,el.dataset.titulo,el.dataset.pdf);
+}
+function delRepoItem(serie){
+  customConfirm('Eliminar reporte '+serie+'?',function(ok){if(ok){loading(true);call('deleteGenerador',{No_Serie:serie},function(_,res){loading(false);if(res&&res.ok){toast('Eliminado','ok');loadRepo();}else toast('Error','er');});}},{icon:'fa-trash-alt',danger:true});
 }
 function clickRepoPrint(el){
   var p=el.parentElement.parentElement;
@@ -3979,7 +3983,8 @@ function renderConfiguracion(el){
           return '<div class="theme-card'+(active?' theme-card-active':'')+'" data-preset="'+p.id+'" onclick="selectThemePreset(\''+p.id+'\')" title="'+p.nombre+'">'
             +'<div class="theme-swatches">'
             +Object.keys(p.colors).slice(0,4).map(function(k){return '<span style="background:'+p.colors[k]+';width:18px;height:18px;border-radius:4px;display:inline-block"></span>';}).join('')
-            +'</div>'
+        +'<button class="ab-btn ab-del" style="font-size:10px;padding:4px 7px" onclick="event.stopPropagation();delRepoItem(\''+esc(r['No Serie'])+'\')"><i class="fas fa-trash"></i></button>'
+        +'</div>'
             +'<div style="font-size:10px;font-weight:700;margin-top:4px;text-align:center;color:var(--tx)">'+p.nombre+'</div>'
           +'</div>';
         }).join('');
@@ -4890,10 +4895,12 @@ function loadNotifLog(){
       return '<tr><td>'+esc(r.titulo||'')+'</td><td>'+canalHtml+'</td><td>'+esc(r.destino)+'</td>'
         +'<td><span class="bdg '+(r.estado==='enviado'?'bg':'bo')+'">'+esc(r.estado)+'</span>'
         +((r.error_msg&&r.estado!=='enviado')?'<br><span style="font-size:10px;color:var(--er)">'+esc(r.error_msg).substring(0,60)+'</span>':'')+'</td>'
-        +'<td style="font-size:11px">'+esc(r.fecha||'')+'</td></tr>';
+        +'<td style="font-size:11px">'+esc(r.fecha||'')+'</td>'
+        +'<td><button class="ab-btn ab-del" style="font-size:10px;padding:2px 6px" onclick="delNotifLog('+r.id+')"><i class="fas fa-times"></i></button></td></tr>';
     }).join('');
   });
 }
+function delNotifLog(id){call('deleteNotificacionLog',{id:id},function(_,res){if(res&&res.ok){toast('Eliminado','ok');loadNotifLog();}else toast('Error','er');});}
 function newNotif(){editNotif(null);}
 function editNotif(id){
   var n=id?_notifsData.find(function(x){return x.id===id;}):{};
