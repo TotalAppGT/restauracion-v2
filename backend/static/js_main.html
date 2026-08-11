@@ -1976,9 +1976,9 @@ function genReporte(){
     }
     prev.appendChild(bar);
     loadRepo();
-    var msg = 'Reporte generado — '+res.noSerie;
-    if(res.pdfStatus) msg += '\n'+res.pdfStatus;
-    toast(msg, res.pdfUrl?'ok':'in', 6000);
+    toast('Reporte generado — '+res.noSerie+' (generando PDF profesional...)','ok',4000);
+    // Auto-generar PDF profesional con html2pdf
+    setTimeout(function(){generarPDFCliente(res.noSerie);},1500);
   });
 }
 function guardarEnDrive(btn){
