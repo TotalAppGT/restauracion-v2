@@ -2816,6 +2816,7 @@ let _envAllReportes=[];
 let _whatsappContacts=[];
 function delEnvioHist(id){call('deleteEnvio',{ID:id},function(_,res){if(res&&res.ok){toast('Eliminado','ok');recargarEnvio();}else toast('Error','er');});}
 function vaciarHistorialEnvios(){customConfirm('Eliminar TODO el historial de envios?',function(ok){if(ok){loading(true);call('vaciarEnvios',{},function(_,res){loading(false);if(res&&res.ok){toast(res.msg,'ok');recargarEnvio();}else toast('Error','er');});}},{icon:'fa-trash-alt',danger:true,color:'#e74c3c'});}
+function recargarEnvio(){
   // Cargar contactos
   call('getContactos',{},(_, c)=>{
     APP.contactos=Array.isArray(c)?c:APP.contactos;
