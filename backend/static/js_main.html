@@ -2800,8 +2800,11 @@ function renderEnvio(el){
       <div id="envWACnts" style="max-height:200px;overflow-y:auto"><div class="empty-r" style="padding:10px"><i class="fas fa-circle-notch fa-spin"></i></div></div>
     </div>
     <div class="card">
-      <div class="ct"><i class="fas fa-history"></i> Historial de Envíos</div>
-      <div id="envHist" style="max-height:200px;overflow-y:auto"><div class="empty-r" style="padding:10px"><i class="fas fa-circle-notch fa-spin"></i></div></div>
+      <div class="ct" style="display:flex;justify-content:space-between;align-items:center">
+        <span><i class="fas fa-history"></i> Historial de Envios</span>
+        <button class="btn btn-er btn-sm" onclick="vaciarHistorialEnvios()"><i class="fas fa-trash-alt"></i> Vaciar Todo</button>
+      </div>
+      <div id="envHist" style="max-height:300px;overflow-y:auto"><div class="empty-r" style="padding:10px"><i class="fas fa-circle-notch fa-spin"></i></div></div>
     </div>
   </div>`;
   _envRepSelected=new Set();
@@ -2811,7 +2814,8 @@ function renderEnvio(el){
 
 let _envAllReportes=[];
 let _whatsappContacts=[];
-function recargarEnvio(){
+function delEnvioHist(id){call('deleteEnvio',{ID:id},function(_,res){if(res&&res.ok){toast('Eliminado','ok');recargarEnvio();}else toast('Error','er');});}
+function vaciarHistorialEnvios(){customConfirm('Eliminar TODO el historial de envios?',function(ok){if(ok){loading(true);call('vaciarEnvios',{},function(_,res){loading(false);if(res&&res.ok){toast(res.msg,'ok');recargarEnvio();}else toast('Error','er');});}},{icon:'fa-trash-alt',danger:true,color:'#e74c3c'});}
   // Cargar contactos
   call('getContactos',{},(_, c)=>{
     APP.contactos=Array.isArray(c)?c:APP.contactos;
@@ -2825,8 +2829,8 @@ function recargarEnvio(){
   // Cargar historial
   call('getEnvios',{},(_, d)=>{
     const el=document.getElementById('envHist');if(!el)return;
-    const data=Array.isArray(d)?d.slice(-10).reverse():[];
-    el.innerHTML=data.length?data.map(e=>`<div class="ri"><div class="rdot" style="background:var(--inf)"></div><div class="rinfo"><div class="rn" style="font-size:12px">${esc(e['Asunto Correo'])}</div><div class="rm">${fmtD(e['Fecha Hora'])} · ${esc(e['Destinatarios']||'—')}</div></div></div>`).join(''):'<p style="font-size:12px;color:var(--tx3);padding:8px">Sin envíos aún</p>';
+    const data=Array.isArray(d)?d.slice(-20).reverse():[];
+    el.innerHTML=data.length?data.map(e=>`<div class="ri" style="display:flex;justify-content:space-between;align-items:center"><div style="display:flex;align-items:center;gap:8px;min-width:0"><div class="rdot" style="background:var(--inf);flex-shrink:0"></div><div class="rinfo" style="min-width:0"><div class="rn" style="font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(e['Asunto Correo'])}</div><div class="rm" style="font-size:10px">${fmtD(e['Fecha Hora'])} · ${esc((e['Destinatarios']||'—').substring(0,30))}</div></div></div><button class="ab-btn ab-del" style="flex-shrink:0;font-size:10px;padding:3px 6px" onclick="event.stopPropagation();delEnvioHist('${esc(e['ID'])}')"><i class="fas fa-times"></i></button></div>`).join(''):'<p style="font-size:12px;color:var(--tx3);padding:8px">Sin envios aun</p>';
   });
   // Cargar repositorio de reportes generados
   call('getGeneradores',{},(_, d)=>{

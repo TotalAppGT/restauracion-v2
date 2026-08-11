@@ -738,6 +738,10 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "deleteEnvio":
             return delete_entity(db, Envio, payload)
 
+        if action == "vaciarEnvios":
+            db.query(Envio).delete(); db.commit()
+            return {"ok": True, "msg": "Historial de envios vaciado"}
+
         if action == "deleteGenerador":
             ns = payload.get("No_Serie") or payload.get("id") or payload.get("ID")
             if not ns: return {"ok": False, "msg": "No Serie requerido"}
