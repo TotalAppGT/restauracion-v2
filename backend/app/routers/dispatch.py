@@ -354,20 +354,18 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         # ── DASHBOARD ──
         if action == "getDashboard":
-            # Determinar rango de fechas
             rango = payload.get("rango","mes")
             hoy = datetime.now().date()
             if rango == "hoy":
                 desde = hoy; hasta = hoy
             elif rango == "semana":
-                desde = hoy - timedelta(days=hoy.weekday())  # Lunes
-                hasta = desde + timedelta(days=6)  # Domingo
+                desde = hoy - timedelta(days=hoy.weekday())
+                hasta = desde + timedelta(days=6)
             elif rango == "mes":
                 desde = hoy.replace(day=1)
-                # Ultimo dia del mes
                 if hoy.month == 12: hasta = hoy.replace(year=hoy.year+1, month=1, day=1) - timedelta(days=1)
                 else: hasta = hoy.replace(month=hoy.month+1, day=1) - timedelta(days=1)
-            else:  # trimestre
+            else:
                 q_inicio = ((hoy.month - 1) // 3) * 3 + 1
                 desde = hoy.replace(month=q_inicio, day=1)
                 if q_inicio + 3 > 12: hasta = hoy.replace(year=hoy.year+1, month=1, day=1) - timedelta(days=1)
@@ -377,10 +375,60 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             lideres = db.query(Hermano).filter(Hermano.codigo_lead != None).count()
             reportes_count = reportes_filtrados.count()
             pendientes = reportes_filtrados.filter(Reporte.ofrenda_recibida.in_(["Pendiente", ""])).count()
-            asistencia_total = db.query(func.coalesce(func.sum(Reporte.asistencia), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar()
-            of_total = float(db.query(func.coalesce(func.sum(Reporte.ofrenda_total), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar())
-            seg_total = db.query(Seguimiento).filter(Seguimiento.fecha >= desde, Seguimiento.fecha <= hasta).count()
-            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "asistencia": int(asistencia_total or 0), "ofTotal": round(of_total or 0, 2), "convertidos": 0, "reconciliados": 0, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": [], "rango": rango, "desde": str(desde), "hasta": str(hasta)}
+            asistencia_total = int(db.query(func.coalesce(func.sum(Reporte.asistencia), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar() or 0)
+            of_total = round(float(db.query(func.coalesce(func.sum(Reporte.ofrenda_total), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar() or 0), 2)
+            
+            # Seguimientos
+            segs_q = db.query(Seguimiento).filter(Seguimiento.fecha >= desde, Seguimiento.fecha <= hasta)
+            seg_total = segs_q.count()
+            convertidos = segs_q.filter(Seguimiento.tipo == "Convertido").count()
+            reconciliados = segs_q.filter(Seguimiento.tipo.ilike("%reconcil%")).count()
+            seg_pendientes = segs_q.filter(Seguimiento.estado.ilike("%pend%")).count()
+            seg_enproceso = segs_q.filter(Seguimiento.estado.ilike("%proceso%")).count()
+            seg_completados = segs_q.filter(Seguimiento.estado.ilike("%complet%")).count()
+            seg_cancelados = segs_q.filter(Seguimiento.estado.ilike("%cancel%")).count()
+            
+            # Digital vs Manual
+            digitales = reportes_filtrados.filter(Reporte.reporte_origen == "Digital").count()
+            manuales = reportes_filtrados.count() - digitales
+            
+            # Asistencia por distrito
+            asist_distrito = []
+            distritos_rows = db.query(Reporte.distrito, func.sum(Reporte.asistencia)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).group_by(Reporte.distrito).all()
+            for d, a in distritos_rows:
+                if d: asist_distrito.append({"distrito": str(d), "asistencia": int(a or 0)})
+            
+            # Hermanos por distrito
+            hnos_distrito = []
+            hd_rows = db.query(Hermano.distrito, func.count(Hermano.id)).filter(Hermano.codigo_lead != None).group_by(Hermano.distrito).all()
+            for d, c in hd_rows:
+                if d: hnos_distrito.append({"distrito": str(d), "total": c})
+            
+            # Grafica mensual (ultimos 6 meses)
+            grafica = []
+            for i in range(5, -1, -1):
+                m = hoy.month - i
+                y = hoy.year
+                if m <= 0: m += 12; y -= 1
+                md = y*100 + m
+                mi = datetime(y, m, 1).date()
+                if m == 12: mf = datetime(y+1, 1, 1).date() - timedelta(days=1)
+                else: mf = datetime(y, m+1, 1).date() - timedelta(days=1)
+                rp = db.query(Reporte).filter(Reporte.fecha >= mi, Reporte.fecha <= mf)
+                g = {}
+                g["mes"] = mi.strftime("%b %Y")
+                g["asistencia"] = int(db.query(func.coalesce(func.sum(Reporte.asistencia),0)).filter(Reporte.fecha >= mi, Reporte.fecha <= mf).scalar() or 0)
+                g["ofrendas"] = round(float(db.query(func.coalesce(func.sum(Reporte.ofrenda_total),0)).filter(Reporte.fecha >= mi, Reporte.fecha <= mf).scalar() or 0), 2)
+                g["grupos"] = rp.count()
+                g["digitales"] = rp.filter(Reporte.reporte_origen == "Digital").count()
+                g["manuales"] = rp.filter(Reporte.reporte_origen != "Digital").count()
+                conv = db.query(Seguimiento).filter(Seguimiento.fecha >= mi, Seguimiento.fecha <= mf, Seguimiento.tipo == "Convertido").count()
+                rec = db.query(Seguimiento).filter(Seguimiento.fecha >= mi, Seguimiento.fecha <= mf, Seguimiento.tipo.ilike("%reconcil%")).count()
+                g["convertidos"] = conv
+                g["reconciliados"] = rec
+                grafica.append(g)
+            
+            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "asistencia": asistencia_total, "ofTotal": of_total, "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados}
 
         # ── HERMANOS (returns RAW ARRAY, matching GAS) ──
         if action == "getHermanos":
