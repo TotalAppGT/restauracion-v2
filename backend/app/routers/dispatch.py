@@ -410,7 +410,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return {"ok": True, "data": [db_to_gas(h, HERMANO_MAP) for h in hnos]}
 
         if action == "registrarReporteDigital":
-            from datetime import date
+            from datetime import date, timedelta
+            today_utc = date.today()
+            # Ajustar a Guatemala UTC-6
+            from datetime import datetime as dt_full
+            now_utc = dt_full.utcnow()
+            guate = now_utc - timedelta(hours=6)
+            today = guate.date()
             codigo = str(payload.get("codigo","")).strip()
             herm = db.query(Hermano).filter(Hermano.codigo_lead == codigo).first()
             hnos = int(payload.get("hermanos",0) or 0)
