@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Iglesia Restauracion — Sistema REDIL</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--pr:#1a3a5c;--pr2:#2563a8;--ok:#1e7e34;--er:#c0392b;--ac:#d68910;--bg:#f0f4f8;--wh:#fff;--shd:0 8px 32px rgba(0,0,0,.15)}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--pr);color:#222;overflow:hidden;height:100vh}
+.slides{display:flex;transition:transform .5s cubic-bezier(.4,0,.2,1);height:100vh}
+.slide{min-width:100vw;height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 60px;background:var(--wh);position:relative;overflow-y:auto}
+.slide.dark{background:linear-gradient(135deg,var(--pr),var(--pr2));color:#fff}
+.slide.dark h1,.slide.dark h2,.slide.dark h3{color:#fff}
+.slide.accent{background:linear-gradient(135deg,#d68910,#b7770d);color:#fff}
+.slide.green{background:linear-gradient(135deg,#1e7e34,#27ae60);color:#fff}
+h1{font-size:48px;font-weight:900;margin-bottom:16px;color:var(--pr)}
+h2{font-size:28px;font-weight:800;margin-bottom:12px;color:var(--pr2)}
+h3{font-size:20px;font-weight:700;margin-bottom:8px;color:var(--pr)}
+p{font-size:16px;line-height:1.7;max-width:800px;text-align:center;margin-bottom:12px;color:#555}
+.slide.dark p,.slide.accent p,.slide.green p{color:rgba(255,255,255,.85)}
+.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;max-width:900px;width:100%}
+.card{background:#fff;border-radius:12px;padding:20px;text-align:center;box-shadow:0 2px 12px rgba(0,0,0,.08);border-left:4px solid var(--pr2)}
+.card .ico{font-size:32px;margin-bottom:8px}
+.card h4{font-size:15px;font-weight:800;color:var(--pr);margin-bottom:4px}
+.card p{font-size:12px;color:#777;line-height:1.4}
+.steps{display:flex;gap:20px;max-width:900px;flex-wrap:wrap;justify-content:center}
+.step{background:#fff;border-radius:16px;padding:24px;text-align:center;flex:1;min-width:180px;max-width:220px;box-shadow:0 2px 12px rgba(0,0,0,.08)}
+.step-num{background:var(--pr2);color:#fff;width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:900;margin:0 auto 10px}
+.step h4{font-size:14px;color:var(--pr);margin-bottom:6px}
+.step p{font-size:11px;color:#777}
+.nav{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:8px;z-index:100}
+.nav button{background:rgba(255,255,255,.2);border:2px solid rgba(255,255,255,.4);color:#fff;width:10px;height:10px;border-radius:50%;cursor:pointer;padding:0;transition:.2s}
+.nav button.active{background:#fff;border-color:#fff;transform:scale(1.3)}
+.arrows{position:fixed;top:50%;transform:translateY(-50%);z-index:100;display:flex;justify-content:space-between;width:100%;padding:0 20px;pointer-events:none}
+.arrows button{background:rgba(26,58,92,.8);color:#fff;border:none;width:44px;height:44px;border-radius:50%;font-size:20px;cursor:pointer;pointer-events:all;transition:.2s}
+.arrows button:hover{background:var(--pr2);transform:scale(1.1)}
+.logo{width:80px;height:80px;border-radius:50%;background:rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:36px;margin-bottom:20px;border:3px solid rgba(255,255,255,.3)}
+.url-box{background:rgba(255,255,255,.15);border:2px dashed rgba(255,255,255,.3);border-radius:10px;padding:12px 24px;font-family:monospace;font-size:18px;margin-top:16px}
+.badge{display:inline-block;padding:6px 14px;border-radius:99px;font-size:11px;font-weight:800;margin:4px}
+.badge-wa{background:#25D366;color:#fff}
+.badge-email{background:#2563a8;color:#fff}
+.badge-pdf{background:#e74c3c;color:#fff}
+.badge-digital{background:#7d3c98;color:#fff}
+@media(max-width:768px){h1{font-size:32px}h2{font-size:22px}.slide{padding:20px}}
+</style>
+</head>
+<body>
+
+<div class="slides" id="slides">
+  <!-- SLIDE 1: Portada -->
+  <div class="slide dark">
+    <div class="logo">⛪</div>
+    <h1>Iglesia Restauración</h1>
+    <p style="font-size:22px;margin-bottom:24px">Sistema de Gestión REDIL</p>
+    <p style="font-size:14px;opacity:.8">Control interno · Formulario digital · Reportes · Notificaciones · Envíos masivos</p>
+    <div style="margin-top:20px">
+      <span class="badge badge-wa">WhatsApp</span>
+      <span class="badge badge-email">Correo</span>
+      <span class="badge badge-pdf">PDF</span>
+      <span class="badge badge-digital">Digital</span>
+    </div>
+  </div>
+
+  <!-- SLIDE 2: ¿Qué es? -->
+  <div class="slide">
+    <h2>📋 ¿Qué es REDIL?</h2>
+    <p>Una plataforma web completa para la <b>gestión administrativa</b> de la iglesia. Centraliza líderes, grupos familiares, reportes semanales, ofrendas, seguimientos y comunicación masiva.</p>
+    <div class="features">
+      <div class="card"><div class="ico">👥</div><h4>Líderes y Grupos</h4><p>Registro de todos los líderes con sus grupos familiares, zonas y distritos</p></div>
+      <div class="card"><div class="ico">📱</div><h4>Formulario Digital</h4><p>Los líderes llenan su reporte semanal desde el celular. Datos llegan en tiempo real</p></div>
+      <div class="card"><div class="ico">📊</div><h4>Dashboard</h4><p>KPIs en tiempo real: asistencia, ofrendas, grupos realizados, pendientes</p></div>
+      <div class="card"><div class="ico">📨</div><h4>Envíos Masivos</h4><p>WhatsApp y correo electrónico para compartir informes, PDFs y notificaciones</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 3: Formulario Digital -->
+  <div class="slide accent">
+    <h2>📱 Formulario Digital</h2>
+    <p>Cada líder llena su reporte semanal desde su celular. Los datos llegan <b>automáticamente</b> al sistema central.</p>
+    <div class="url-box">iglesiarestauracion.totalappgt.online/form</div>
+    <div class="steps" style="margin-top:24px">
+      <div class="step"><div class="step-num">1</div><h4>Buscar Líder</h4><p>Escribe el código o nombre del líder. Autocomplete en tiempo real</p></div>
+      <div class="step"><div class="step-num">2</div><h4>Llenar Datos</h4><p>Asistencia, ofrendas, cultos y seguimientos de nuevas personas</p></div>
+      <div class="step"><div class="step-num">3</div><h4>Enviar</h4><p>El reporte se guarda automáticamente y aparece en el sistema como "Pendiente"</p></div>
+      <div class="step"><div class="step-num">4</div><h4>Confirmar</h4><p>El administrador marca la ofrenda como "Recibida" cuando el líder la entrega</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 4: Dashboard -->
+  <div class="slide">
+    <h2>📊 Dashboard en Tiempo Real</h2>
+    <p>Vista general del estado de la iglesia: hoy, esta semana, este mes o trimestre</p>
+    <div class="features">
+      <div class="card"><div class="ico">👥</div><h4>Líderes</h4><p>Total de líderes registrados en el sistema</p></div>
+      <div class="card"><div class="ico">🏠</div><h4>Grupos</h4><p>Reportes realizados en el período seleccionado</p></div>
+      <div class="card"><div class="ico">🙏</div><h4>Asistencia</h4><p>Total de personas que asistieron a los grupos</p></div>
+      <div class="card"><div class="ico">💰</div><h4>Ofrenda</h4><p>Monto total de ofrendas del período</p></div>
+      <div class="card"><div class="ico">⏳</div><h4>Pendientes</h4><p>Reportes con ofrenda pendiente de entrega</p></div>
+      <div class="card"><div class="ico">📈</div><h4>Gráficas</h4><p>Asistencia, ofrendas, grupos vs meta, convertidos y más</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 5: Reportes y Generador -->
+  <div class="slide dark">
+    <h2>📄 Reportes y Generador PDF</h2>
+    <p>Genera informes profesionales con KPIs, tablas y gráficos. Los PDFs se generan automáticamente con diseño moderno.</p>
+    <div class="features">
+      <div class="card"><div class="ico">🔍</div><h4>Filtros</h4><p>Por fecha, líder, distrito, zona, supervisor y más</p></div>
+      <div class="card"><div class="ico">📋</div><h4>Tabla Completa</h4><p>Código, líder, fecha, D-Z, AGF, ofrenda, estado</p></div>
+      <div class="card"><div class="ico">📊</div><h4>8 KPIs</h4><p>Reportes, asistencia, ofrenda, % recibidas, pendientes, hnos, amigos, niños</p></div>
+      <div class="card"><div class="ico">📱</div><h4>Origen</h4><p>Digital (formulario) o Físico (manual en sistema)</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 6: Notificaciones -->
+  <div class="slide">
+    <h2>🔔 Notificaciones Programables</h2>
+    <p>Programa recordatorios, avisos y reuniones que se envían automáticamente por WhatsApp y correo</p>
+    <div class="features">
+      <div class="card"><div class="ico">⏰</div><h4>Frecuencia</h4><p>Una vez, diaria, semanal o mensual</p></div>
+      <div class="card"><div class="ico">📝</div><h4>Tipos</h4><p>Recordatorio, reunión, aviso, reporte, alerta, ofrenda</p></div>
+      <div class="card"><div class="ico">📅</div><h4>Campos</h4><p>Fecha, hora, lugar, cita bíblica, mensaje personalizado</p></div>
+      <div class="card"><div class="ico">👥</div><h4>Canales</h4><p>WhatsApp y/o correo electrónico por destinatario</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 7: WhatsApp y Correo -->
+  <div class="slide green">
+    <h2>📨 Envíos WhatsApp y Correo</h2>
+    <p>Comparte informes, reportes y comunicados por WhatsApp (con PDF adjunto) y correo electrónico</p>
+    <div class="features" style="margin-top:16px">
+      <div class="card"><div class="ico">📄</div><h4>PDF Adjunto</h4><p>Envía el informe completo como documento PDF por WhatsApp</p></div>
+      <div class="card"><div class="ico">✉️</div><h4>Correo HTML</h4><p>Correo profesional con el nombre de la iglesia, tablas y totales</p></div>
+      <div class="card"><div class="ico">📋</div><h4>Plantilla</h4><p>Mensajes pre-formateados con el nombre de la iglesia</p></div>
+      <div class="card"><div class="ico">📱</div><h4>+502 Auto</h4><p>Escribe 8 dígitos y el sistema agrega el prefijo automáticamente</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 8: Cuadre Dominical -->
+  <div class="slide">
+    <h2>📐 Cuadre Dominical</h2>
+    <p>Cierre semanal: quién entregó su reporte y ofrenda, quién está pendiente. Vista por distrito y zona.</p>
+    <div class="features">
+      <div class="card"><div class="ico">✅</div><h4>Entregaron</h4><p>Líderes que ya enviaron su reporte</p></div>
+      <div class="card"><div class="ico">⏳</div><h4>Pendientes</h4><p>Líderes que aún no reportan</p></div>
+      <div class="card"><div class="ico">📊</div><h4>Agrupado</h4><p>Vista por Distrito → Zona → Líder</p></div>
+      <div class="card"><div class="ico">📄</div><h4>PDF</h4><p>Genera PDF del cuadre para imprimir o compartir</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 9: Roles y Seguridad -->
+  <div class="slide dark">
+    <h2>🔐 Usuarios, Roles y Seguridad</h2>
+    <p>Control de acceso granular. Cada usuario ve solo lo que necesita.</p>
+    <div class="features">
+      <div class="card"><div class="ico">👑</div><h4>Propietario</h4><p>Acceso total. Configuración, bitácora, todos los módulos</p></div>
+      <div class="card"><div class="ico">⚙️</div><h4>Admin</h4><p>Módulos asignados. Puede ver bitácora si se le otorga</p></div>
+      <div class="card"><div class="ico">✏️</div><h4>Digitador</h4><p>Ingresa reportes manuales. Solo lectura en otros módulos</p></div>
+      <div class="card"><div class="ico">🔐</div><h4>Google Auth</h4><p>Inicio de sesión con cuenta de Google (Firebase)</p></div>
+    </div>
+  </div>
+
+  <!-- SLIDE 10: Cómo empezar -->
+  <div class="slide green">
+    <h2>🚀 Cómo Empezar</h2>
+    <div class="features">
+      <div class="card"><div class="ico">1</div><h4>Dashboard</h4><p>Revisa los KPIs y el estado general</p></div>
+      <div class="card"><div class="ico">2</div><h4>Comparte el Form</h4><p>Envía /form a los líderes</p></div>
+      <div class="card"><div class="ico">3</div><h4>Revisa Reportes</h4><p>Mira los reportes que van llegando</p></div>
+      <div class="card"><div class="ico">4</div><h4>Marca Ofrendas</h4><p>Cuando entreguen, marca como Recibida</p></div>
+      <div class="card"><div class="ico">5</div><h4>Genera Informes</h4><p>Crea PDFs profesionales y compártelos</p></div>
+      <div class="card"><div class="ico">6</div><h4>Cuadre Semanal</h4><p>Cada domingo, revisa quién cumplió</p></div>
+    </div>
+    <div class="url-box" style="margin-top:20px">iglesiarestauracion.totalappgt.online</div>
+  </div>
+</div>
+
+<div class="arrows">
+  <button onclick="move(-1)">◀</button>
+  <button onclick="move(1)">▶</button>
+</div>
+<div class="nav" id="nav"></div>
+
+<script>
+var current=0,total=document.querySelectorAll('.slide').length;
+var nav=document.getElementById('nav');
+for(var i=0;i<total;i++){var b=document.createElement('button');b.onclick=(function(idx){return function(){go(idx)};})(i);nav.appendChild(b)}
+function go(i){current=Math.max(0,Math.min(total-1,i));document.getElementById('slides').style.transform='translateX(-'+current*100+'vw)';nav.querySelectorAll('button').forEach(function(b,idx){b.className=idx===current?'active':''})}
+function move(d){go(current+d)}
+go(0);
+document.addEventListener('keydown',function(e){if(e.key==='ArrowRight')move(1);if(e.key==='ArrowLeft')move(-1)});
+</script>
+</body>
+</html>
