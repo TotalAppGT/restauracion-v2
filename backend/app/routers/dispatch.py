@@ -1146,7 +1146,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 estado = "Enviado"
             except Exception as e:
                 estado = f"Error: {str(e)}"
-            db.add(Envio(fecha_envio=datetime.utcnow(), asunto=subj, mensaje=cuerpo, archivos_a_enviar=",".join(series), destinatarios=",".join(emails_list), estado=estado))
+            db.add(Envio(fecha_envio=datetime.utcnow(), asunto=subj, mensaje=cuerpo, archivos_a_enviar=",".join(series)[:50], destinatarios=",".join(emails_list)[:500], estado=str(estado)[:45]))
             db.commit()
             if estado != "Enviado":
                 return {"ok": False, "msg": estado}
@@ -1173,7 +1173,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 estado = "Enviado"
             except Exception as e:
                 estado = f"Error: {str(e)}"
-            db.add(Envio(fecha_envio=datetime.utcnow(), asunto=subj, mensaje=cuerpo, archivos_a_enviar="", destinatarios=",".join(emails_list), estado=estado))
+            db.add(Envio(fecha_envio=datetime.utcnow(), asunto=subj, mensaje=cuerpo, archivos_a_enviar="", destinatarios=",".join(emails_list)[:500], estado=str(estado)[:45]))
             db.commit()
             if estado != "Enviado":
                 return {"ok": False, "msg": estado}
@@ -1554,7 +1554,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         if action == "enviarNotificacionPrueba":
             from app.whatsapp_utils import send_whatsapp_template
-            from app.email_utils import send_email
             from datetime import datetime as dt
             from app.models import NotificacionLog
             numero = str(payload.get("numero", "") or "").replace("+", "").replace(" ", "").replace("-", "")
