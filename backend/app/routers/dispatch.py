@@ -782,7 +782,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if payload.get("desde"): q = q.filter(Bitacora.fecha >= payload["desde"])
             if payload.get("hasta"): q = q.filter(Bitacora.fecha <= payload["hasta"])
             if payload.get("rol"): q = q.filter(Bitacora.rol == payload["rol"])
-            return [db_to_gas(b, BITACORA_MAP) for b in q.limit(500).all()]
+            rows = q.limit(500).all()
+            return [{"ID": r.id, "FechaHora": str(r.fecha) if r.fecha else "", "Usuario": r.usuario or "", "Email": r.email or "", "Rol": r.rol or "", "Accion": r.accion or "", "Detalles": r.detalle or ""} for r in rows]
 
         if action == "limpiarBitacora":
             db.query(Bitacora).delete(); db.commit()
