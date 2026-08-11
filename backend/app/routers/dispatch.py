@@ -348,9 +348,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return {"ok": True}
 
         if action == "registrarAcceso":
-            db.add(Bitacora(fecha=datetime.utcnow(), usuario=payload.get("usuario",""), email=payload.get("email",""), rol=payload.get("rol",""), accion=payload.get("accion","Login"), detalle=payload.get("detalles","")))
-            db.commit()
-            return {"ok": True}
+            try:
+                db.add(Bitacora(fecha=datetime.utcnow(), usuario=payload.get("usuario",""), email=payload.get("email",""), rol=payload.get("rol",""), accion=payload.get("accion","Login"), detalle=payload.get("detalles","")))
+                db.commit()
+                return {"ok": True}
+            except Exception as e:
+                print(f"ERROR registrarAcceso: {e}")
+                return {"ok": False, "msg": str(e)[:100]}
 
         # ── DASHBOARD ──
         if action == "getDashboard":
