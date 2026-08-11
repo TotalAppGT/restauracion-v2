@@ -353,7 +353,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "getDashboard":
             # Determinar rango de fechas
             rango = payload.get("rango","mes")
-            hoy = date.today()
+            hoy = datetime.now().date()
             if rango == "hoy":
                 desde = hoy; hasta = hoy
             elif rango == "semana":
