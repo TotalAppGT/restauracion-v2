@@ -785,7 +785,7 @@ function renderReportes(el){
     </div>
     <div id="filtrosActivos" style="display:none;align-items:center;gap:8px;padding:6px 14px;background:rgba(37,99,168,.06);border-bottom:1px solid var(--brd);font-size:12px;color:var(--pr);flex-wrap:wrap"></div>
     <div class="rg" id="repRes" style="padding:10px 14px;border-bottom:1px solid var(--brd)"></div>
-    <div class="tw" style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table>
+    <div class="tw" style="overflow-x:auto;-webkit-overflow-scrolling:touch;max-width:100%"><table style="min-width:900px">
       <thead><tr><th>Fecha</th><th>Codigo</th><th>Lider</th><th>Sup.Sector</th><th>Anfitrion</th><th>H.Ini</th><th>H.Fin</th><th>AGF</th><th>H</th><th>Am</th><th>N</th><th>OfIg</th><th>OfBus</th><th>OfTot</th><th>Total</th><th>Reporte</th><th>Ofrenda</th><th>Acciones</th></tr></thead>
       <tbody id="repTb"></tbody>
     </table></div>
@@ -1221,10 +1221,10 @@ function renderRepTable(){
     var reunionTipo=r['Tipo de Reporte']||'';
     if(reunionTipo==='Reporte Digital'||reunionTipo==='Reporte Fisico')reunionTipo='Mixta (Reunion Regular)';
     var origBadge=origen==='Digital'?'<span class="bdg bi">Digital</span>':'<span class="bdg bb">Fisico</span>';
-    return `<tr style="${isPend?'background:#fff5f5;':''}cursor:pointer" onclick="viewRep('${esc(r['ID'])}')" title="Click para ver detalle">
+    return `<tr style="${isPend?'background:#fff5f5;':''}">
     <td>${fmtD(r['Fecha'])}</td>
-    <td><span class="bdg bb">${esc(r['Codigo'])}</span></td>
-    <td><b>${esc(r['Lider'])}</b></td>
+    <td><span class="bdg bb" style="cursor:pointer" onclick="event.stopPropagation();viewRep('${esc(r['ID'])}')">${esc(r['Codigo'])}</span></td>
+    <td><b style="cursor:pointer" onclick="event.stopPropagation();viewRep('${esc(r['ID'])}')">${esc(r['Lider'])}</b></td>
     <td>${esc(r['Sup Sector'])}</td><td>${esc(r['Anfitrion'])}</td>
     <td>${esc(r['Hora Inicio'])}</td><td>${esc(r['Hora Final'])}</td>
     <td><b>${r['Asistencia Grupo Familiar']||0}</b></td>
@@ -1238,9 +1238,9 @@ function renderRepTable(){
       :`<span class="bdg bg" style="font-size:11px">✓ Recibida</span>`
     }</td>
     <td><div class="ab">
-      <button class="ab-btn ab-vw" onclick="viewRep('${esc(r['ID'])}')"><i class="fas fa-eye"></i></button>
-      ${permisoEditar()?`<button class="ab-btn ab-ed" onclick="editRep('${esc(r['ID'])}')"><i class="fas fa-edit"></i></button>
-      <button class="ab-btn ab-del" onclick="delRep('${esc(r['ID'])}')"><i class="fas fa-trash"></i></button>`:''}
+      <button class="ab-btn ab-vw" onclick="event.stopPropagation();viewRep('${esc(r['ID'])}')"><i class="fas fa-eye"></i></button>
+      ${permisoEditar()?`<button class="ab-btn ab-ed" onclick="event.stopPropagation();editRep('${esc(r['ID'])}')"><i class="fas fa-edit"></i></button>
+      <button class="ab-btn ab-del" onclick="event.stopPropagation();delRep('${esc(r['ID'])}')"><i class="fas fa-trash"></i></button>`:''}
     </div></td></tr>`;
   }).join('');
 }
