@@ -428,7 +428,11 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 g["reconciliados"] = rec
                 grafica.append(g)
             
-            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "asistencia": asistencia_total, "ofTotal": of_total, "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados}
+            # Ultimos reportes (max 10)
+            ultimos = reportes_filtrados.order_by(Reporte.fecha.desc(), Reporte.id.desc()).limit(10).all()
+            recientes = [{"Lider": r.lider, "Fecha": str(r.fecha), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Tipo de Reporte": r.tipo_reporte or "", "Reporte": r.reporte_origen or ""} for r in ultimos]
+            
+            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "asistencia": asistencia_total, "ofTotal": of_total, "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados, "recientes": recientes}
 
         # ── HERMANOS (returns RAW ARRAY, matching GAS) ──
         if action == "getHermanos":
