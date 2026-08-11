@@ -776,11 +776,11 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         # ── BITACORA (raw array) ──
         if action == "getBitacora":
-            q = db.query(Bitacora).order_by(Bitacora.fecha.desc()).limit(500)
+            q = db.query(Bitacora).order_by(Bitacora.fecha.desc())
             if payload.get("desde"): q = q.filter(Bitacora.fecha >= payload["desde"])
             if payload.get("hasta"): q = q.filter(Bitacora.fecha <= payload["hasta"])
             if payload.get("rol"): q = q.filter(Bitacora.rol == payload["rol"])
-            return [db_to_gas(b, BITACORA_MAP) for b in q.all()]
+            return [db_to_gas(b, BITACORA_MAP) for b in q.limit(500).all()]
 
         if action == "limpiarBitacora":
             db.query(Bitacora).delete(); db.commit()
