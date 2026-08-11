@@ -778,14 +778,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         # ── BITACORA (raw array) ──
         if action == "getBitacora":
-            from app.models import Bitacora as Bita
-            q = db.query(Bita).order_by(Bita.fecha.desc())
-            if payload.get("desde"): q = q.filter(Bita.fecha >= payload["desde"])
-            if payload.get("hasta"): q = q.filter(Bita.fecha <= payload["hasta"])
-            if payload.get("rol"): q = q.filter(Bita.rol == payload["rol"])
-            rows = q.limit(500).all()
-            print(f"[BITACORA] Total rows: {len(rows)}")
-            return [{"ID": r.id, "FechaHora": str(r.fecha) if r.fecha else "", "Usuario": r.usuario or "", "Email": r.email or "", "Rol": r.rol or "", "Accion": r.accion or "", "Detalles": r.detalle or ""} for r in rows]
+            from sqlalchemy import text
+            rows = db.execute(text("SELECT id, fecha, usuario, email, rol, accion, detalle FROM bitacora ORDER BY fecha DESC LIMIT 500")).fetchall()
+            return [{"ID": r[0], "FechaHora": str(r[1]) if r[1] else "", "Usuario": r[2] or "", "Email": r[3] or "", "Rol": r[4] or "", "Accion": r[5] or "", "Detalles": r[6] or ""} for r in rows]
 
         if action == "limpiarBitacora":
             db.query(Bitacora).delete(); db.commit()
