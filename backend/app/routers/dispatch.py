@@ -189,6 +189,7 @@ ENVIO_MAP = {"ID": "id", "IDEnvio": "id_envio", "Fecha Hora": "fecha_hora", "Asu
 USUARIO_MAP = {"ID": "id", "Nombre": "nombre", "Email": "email", "Rol": "rol", "Activo": "activo", "MenuPermitido": "menu_permitido", "PuedeVerBitacora": "puede_ver_bitacora"}
 GENERADOR_MAP = {"ID": "id", "ID_Reporte": "id_reporte", "Fecha Inicio": "fecha_inicio", "Fecha Fin": "fecha_fin", "Total Ofrenda": "total_ofrenda", "Total Asistencia": "total_asistencia", "Titulo de Reporte": "titulo_reporte", "Archivo Generado": "archivo_generado", "No Serie": "no_serie", "Mes Reporte": "mes_reporte", "Ano Reporte": "ano_reporte", "Filtro Lider": "filtro_lider", "Filtro Sup Sector": "filtro_sup_sector", "Filtro Sup Area": "filtro_sup_area", "Filtro Pastor Zona": "filtro_pastor_zona", "Filtro Distrito": "filtro_distrito", "Filtro Zona": "filtro_zona"}
 BAUTIZO_MAP = {"ID": "id", "Fecha": "fecha", "Nombre": "nombre", "Edad": "edad", "Telefono": "telefono", "Direccion": "direccion", "PastorOficiante": "pastor_oficiante", "Lugar": "lugar", "Observaciones": "observaciones", "Activo": "activo"}
+REPORTE_MAP = {"ID": "id", "Codigo": "codigo", "Lider": "lider", "Fecha": "fecha", "Distrito": "distrito", "Zona": "zona", "Area": "area", "Sector": "sector", "Grupo": "grupo", "Sup Sector": "sup_sector", "Sup Area": "sup_area", "Pastor Zona": "pastor_zona", "Anfitrion": "anfitrion", "Direccion": "direccion", "Hora Inicio": "hora_inicio", "Hora Final": "hora_final", "Hnos": "hnos", "Amigos": "amigos", "Niños": "ninos", "Asistencia Grupo Familiar": "asistencia", "Ofrenda Iglesia": "ofrenda_iglesia", "Ofrenda Bus": "ofrenda_bus", "Ofrenda Total": "ofrenda_total", "Ofrenda Recibida": "ofrenda_recibida", "Tipo de Reporte": "tipo_reporte", "Reporte": "reporte_origen", "Martes": "martes", "Jueves": "jueves", "Domingo": "domingo", "Otros": "otros", "Total": "total_cultos"}
 
 def get_user_from_token(token: str, db: Session):
     try:
@@ -243,6 +244,8 @@ def db_to_gas(obj, field_map):
 def save_entity(db, model_class, field_map, payload, id_key="ID"):
     item_id = payload.get(id_key)
     data = payload_to_kwargs(field_map, payload)
+    if not item_id:
+        data.pop("id", None)  # Evitar error de ID vacio en PostgreSQL
     if item_id:
         obj = db.query(model_class).filter(model_class.id == item_id).first()
         if not obj:
@@ -384,7 +387,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return [{"ID": r.id, "Codigo": r.codigo, "Lider": r.lider, "Fecha": str(r.fecha) if r.fecha else "", "Distrito": r.distrito, "Zona": r.zona, "Area": r.area, "Sector": r.sector, "Grupo": r.grupo, "Ofrenda Total": float(r.ofrenda_total or 0), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Asistencia Grupo Familiar": r.asistencia or 0, "Hnos": r.hnos or 0, "Amigos": r.amigos or 0, "Niños": r.ninos or 0, "Tipo de Reporte": r.tipo_reporte or "", "Origen": r.reporte_origen or "Fisico"} for r in reportes]
 
         if action == "saveReporte":
-            return save_entity(db, Reporte, HERMANO_MAP, payload)
+            return save_entity(db, Reporte, REPORTE_MAP, payload)
 
         if action == "deleteReporte":
             return delete_entity(db, Reporte, payload)
@@ -696,6 +699,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         # ── ENVIOS (raw array) ──
         if action == "getEnvios":
             return [db_to_gas(e, ENVIO_MAP) for e in db.query(Envio).all()]
+
+        if action == "deleteEnvio":
+            return delete_entity(db, Envio, payload)
 
         # ── USUARIOS (raw array) ──
         if action == "getUsuarios":
