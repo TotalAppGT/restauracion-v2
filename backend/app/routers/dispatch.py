@@ -432,7 +432,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             of_bus = float(payload.get("ofrendaBus",0) or 0)
             of_tot = of_ig + of_bus
             seg_count = sum(1 for i in range(1,11) if payload.get(f"nombre{i}","") and str(payload.get(f"nombre{i}","")).strip())
-            today = date.today()
             r = Reporte(
                 codigo=codigo,
                 lider=herm.nombre if herm else codigo,
