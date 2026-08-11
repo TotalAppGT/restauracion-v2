@@ -432,7 +432,7 @@ function renderDashboard(el){
   </div>
   <!-- KPIs compactos responsive -->
   <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:14px" id="dashStats">
-    ${Array(6).fill('<div class="sc" style="min-height:70px"><div class="g-spinner" style="width:18px;height:18px;border-width:3px"></div></div>').join('')}
+    ${Array(6).fill('<div class="sc" style="min-height:70px"><div class="sc-v">—</div><div class="sc-l">Cargando...</div></div>').join('')}
   </div>
   <!-- Acceso rapido -->
   <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:6px;margin-bottom:14px" id="dashQuickActions">
@@ -465,7 +465,10 @@ function recargarDash(){
   const lbl=document.getElementById('dashRangoLbl');
   if(lbl)lbl.textContent='('+{hoy:'Hoy',semana:'Esta semana',mes:'Este mes',trimestre:'Trimestre'}[rango]+')';
   call('getDashboard',{rango},(err,d)=>{
-    if(!d||!d.ok)return;
+    if(!d||!d.ok){
+      const sg=document.getElementById('dashStats');if(sg)sg.innerHTML='<div class="empty-r" style="grid-column:1/-1"><i class="fas fa-chart-bar"></i><p>Error al cargar datos</p></div>';
+      return;
+    }
     _dashData=d;
     buildDashKPIs(d);
     buildDashCharts(d);
