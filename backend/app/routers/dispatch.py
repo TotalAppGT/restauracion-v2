@@ -791,7 +791,12 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return [db_to_gas(e, ENVIO_MAP) for e in db.query(Envio).all()]
 
         if action == "deleteEnvio":
-            return delete_entity(db, Envio, payload)
+            ev_id = payload.get("ID") or payload.get("id")
+            if not ev_id: return {"ok": False, "msg": "ID requerido"}
+            obj = db.query(Envio).filter(Envio.id == int(ev_id)).first()
+            if not obj: return {"ok": False, "msg": "No encontrado"}
+            db.delete(obj); db.commit()
+            return {"ok": True}
 
         if action == "vaciarEnvios":
             db.query(Envio).delete(); db.commit()
