@@ -778,11 +778,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         # ── BITACORA (raw array) ──
         if action == "getBitacora":
-            q = db.query(Bitacora).order_by(Bitacora.fecha.desc())
-            if payload.get("desde"): q = q.filter(Bitacora.fecha >= payload["desde"])
-            if payload.get("hasta"): q = q.filter(Bitacora.fecha <= payload["hasta"])
-            if payload.get("rol"): q = q.filter(Bitacora.rol == payload["rol"])
+            from app.models import Bitacora as Bita
+            q = db.query(Bita).order_by(Bita.fecha.desc())
+            if payload.get("desde"): q = q.filter(Bita.fecha >= payload["desde"])
+            if payload.get("hasta"): q = q.filter(Bita.fecha <= payload["hasta"])
+            if payload.get("rol"): q = q.filter(Bita.rol == payload["rol"])
             rows = q.limit(500).all()
+            print(f"[BITACORA] Total rows: {len(rows)}")
             return [{"ID": r.id, "FechaHora": str(r.fecha) if r.fecha else "", "Usuario": r.usuario or "", "Email": r.email or "", "Rol": r.rol or "", "Accion": r.accion or "", "Detalles": r.detalle or ""} for r in rows]
 
         if action == "limpiarBitacora":
