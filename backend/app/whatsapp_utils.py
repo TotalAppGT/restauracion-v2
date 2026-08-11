@@ -122,7 +122,7 @@ def send_whatsapp_document(to_number, pdf_url, caption="", filename="informe.pdf
             parts = pdf_url.strip("/").split("/")
             if parts:
                 no_serie = parts[-1]
-                fn = f"REST_{no_serie}.pdf"
+                fn = f"{no_serie}.pdf"
         print(f"[WA-DOC] Enviando a {clean_number} link={pdf_url} fn={fn}")
         resp = httpx.post(
             WHATSAPP_API,

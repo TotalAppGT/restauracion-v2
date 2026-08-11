@@ -238,7 +238,7 @@ def descargar_pdf(no_serie: str):
         if not gr: return Response(b"PDF no encontrado",404)
         if gr.pdf_data:
             pdf_bytes = base64.b64decode(gr.pdf_data)
-            fname = f"REST_{gr.titulo_reporte or 'Reporte'}_{no_serie}.pdf".replace(' ','_').replace('/','-')
+            fname = f"{gr.titulo_reporte or 'Reporte'}_{no_serie}.pdf".replace(' ','_').replace('/','-')
             return Response(pdf_bytes, media_type="application/pdf",
                 headers={"Content-Disposition": f'inline; filename="{fname}"'})
         return Response(b"PDF no disponible",404)
