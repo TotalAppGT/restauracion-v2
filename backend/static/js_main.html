@@ -3643,8 +3643,8 @@ function guardarGasto(id){
   loading(true);
   var catVal=g('gf_cat');
   if(catVal==='Otro'){var customCat=(g('gf_cat_custom')||'').trim();if(customCat)catVal=customCat;}
-  var payload={fecha:fecha,evento:evento,categoria:catVal,descripcion:desc,monto:parseFloat(monto)||0,responsable:g('gf_resp'),metodo:g('gf_metodo'),observaciones:g('gf_obs')};
-  if(id)payload.id=id;
+  var payload={Fecha:fecha,Evento:evento,Categoria:catVal,Descripcion:desc,MontoQ:parseFloat(monto)||0,Responsable:g('gf_resp'),Metodo:g('gf_metodo'),Observaciones:g('gf_obs')};
+  if(id)payload.ID=id;
   call('saveGasto',payload,function(_,res){
     loading(false);
     if(res&&res.ok){toast(res.msg||'Gasto guardado','ok');closeModal();loadGastos();}
