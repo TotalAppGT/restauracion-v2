@@ -64,6 +64,86 @@ function fom(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1
 function fom30(){var d=new Date();d.setDate(d.getDate()-30);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function mesNombre(s){if(!s)return'';var m=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];try{return m[new Date(s+'T12:00:00').getMonth()];}catch(e){return s;}}
 function exportXLS(data,name,file){loading(true);call('exportExcel',{data:data,nombreHoja:name,nombreArchivo:file},function(_,res){loading(false);if(res&&res.ok){var url=res.xlsxUrl||res.url;window.open(url,'_blank');}else toast((res&&res.msg)||'Error al exportar','er');});}
+function imprimirHermanos(){
+  imprimirTabla('Hermanos Lideres',[
+    {key:'CodigoL',label:'Codigo'},{key:'NombreL',label:'Nombre'},{key:'Distrito',label:'D'},
+    {key:'Zona',label:'Z'},{key:'Area',label:'A'},{key:'Sector',label:'S'},{key:'Grupo',label:'G'},
+    {key:'Pastor Zona',label:'Pastor Zona'},{key:'Sup SectorL',label:'Supervisor Sector'},
+    {key:'Sup AreaL',label:'Ayuda Pastor'},{key:'Anfitrion',label:'Anfitrion'},{key:'Direccion',label:'Direccion'}
+  ],_herm,'Distrito');
+}
+function imprimirSupervisores(){
+  imprimirTabla('Supervisores de Sector',[
+    {key:'CodigoSup',label:'Codigo'},{key:'NombreSup',label:'Nombre'},{key:'Distrito',label:'D'},
+    {key:'Zona',label:'Z'},{key:'Area',label:'A'},{key:'Sector',label:'S'},{key:'Telefono',label:'Telefono'},{key:'Email',label:'Email'}
+  ],_svs,'Distrito');
+}
+function imprimirPastores(){
+  imprimirTabla('Pastores de Zona',[
+    {key:'CodigoPastor',label:'Codigo'},{key:'NombrePastor',label:'Nombre'},{key:'Distrito',label:'D'},
+    {key:'Zona',label:'Z'},{key:'Telefono',label:'Telefono'},{key:'Email',label:'Email'}
+  ],_pas,'Distrito');
+}
+function imprimirAyuda(){
+  imprimirTabla('Ayuda de Pastor',[
+    {key:'CodigoAyuda',label:'Codigo'},{key:'NombreAyuda',label:'Nombre'},{key:'Distrito',label:'D'},
+    {key:'Zona',label:'Z'},{key:'Area',label:'A'},{key:'Telefono',label:'Telefono'},{key:'Email',label:'Email'}
+  ],_ayu,'Distrito');
+}
+function imprimirInventario(){
+  imprimirTabla('Inventario',[
+    {key:'Articulo',label:'Articulo'},{key:'Categoria',label:'Categoria'},{key:'Cantidad',label:'Cantidad'},
+    {key:'Unidad',label:'Unidad'},{key:'Estado',label:'Estado'},{key:'Ubicacion',label:'Ubicacion'},{key:'ValorQ',label:'Valor Q'}
+  ],_inv,'Categoria');
+}
+function imprimirInsumos(){
+  imprimirTabla('Insumos',[
+    {key:'Articulo',label:'Articulo'},{key:'Categoria',label:'Categoria'},{key:'Cantidad',label:'Cantidad'},
+    {key:'Unidad',label:'Unidad'},{key:'PrecioUnitarioQ',label:'Precio Q'},{key:'StockMinimo',label:'Stock Min'},{key:'Proveedor',label:'Proveedor'}
+  ],_ins,'Categoria');
+}
+function imprimirTabla(titulo,columnas,filas,grupoPor){
+  if(!filas||!filas.length){toast('No hay datos para imprimir','wa');return;}
+  var sysName=(APP.config&&APP.config.nombre)||'Iglesia Restauracion';
+  var hoy=new Date().toLocaleDateString('es-GT');
+  // Agrupar si se pide
+  var grupos=[{titulo:'',filas:filas}];
+  if(grupoPor){
+    var map={};
+    filas.forEach(function(r){var k=r[grupoPor]||'Sin asignar';if(!map[k])map[k]=[];map[k].push(r);});
+    grupos=Object.keys(map).sort().map(function(k){return {titulo:k,filas:map[k]};});
+  }
+  var thead='<tr>'+columnas.map(function(c){return '<th>'+esc(c.label)+'</th>';}).join('')+'</tr>';
+  var body='';
+  grupos.forEach(function(g){
+    if(g.titulo){body+='<tr class="grp"><td colspan="'+columnas.length+'">'+esc(grupoPor)+': '+esc(g.titulo)+' ('+g.filas.length+')</td></tr>';}
+    g.filas.forEach(function(r){
+      body+='<tr>'+columnas.map(function(c){var v=r[c.key];if(v===undefined||v===null)v='';return '<td>'+esc(v)+'</td>';}).join('')+'</tr>';
+    });
+  });
+  var w=window.open('','_blank','width=1000,height=700');
+  if(!w){toast('Activa ventanas emergentes','wa',5000);return;}
+  w.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>'+esc(titulo)+'</title>'
+  +'<style>*{box-sizing:border-box}body{font-family:Arial,Helvetica,sans-serif;margin:0;padding:20px;background:#f5f6fa;color:#222}'
+  +'@page{size:letter landscape;margin:10mm}'
+  +'.hdr{background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:14px 18px;border-radius:8px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  +'.hdr h1{margin:0;font-size:18px}.hdr .sub{font-size:11px;opacity:.85;margin-top:2px}'
+  +'.hdr .badge{background:rgba(255,255,255,.2);padding:4px 12px;border-radius:99px;font-size:11px;font-weight:700}'
+  +'table{width:100%;border-collapse:collapse;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.06)}'
+  +'thead th{background:#1a3a5c;color:#fff;font-size:11px;text-transform:uppercase;letter-spacing:.3px;padding:8px 10px;text-align:left;-webkit-print-color-adjust:exact;print-color-adjust:exact}'
+  +'tbody td{padding:7px 10px;font-size:11px;border-bottom:1px solid #eef0f5}'
+  +'tbody tr:nth-child(even){background:#f8fafc}'
+  +'.grp td{background:#e2e8f0;font-weight:800;font-size:11px;color:#1a3a5c;padding:7px 10px}'
+  +'.ftr{margin-top:12px;font-size:10px;color:#888;text-align:center}'
+  +'@media print{body{background:#fff;padding:0}.hdr{border-radius:0}table{box-shadow:none}}'
+  +'</style></head><body>'
+  +'<div class="hdr"><div><h1>'+esc(titulo)+'</h1><div class="sub">'+esc(sysName)+' · '+hoy+'</div></div><div class="badge">'+filas.length+' registros</div></div>'
+  +'<table><thead>'+thead+'</thead><tbody>'+body+'</tbody></table>'
+  +'<div class="ftr">'+esc(sysName)+' · iglesiarestauracion.totalappgt.online</div>'
+  +'<script>window.onload=function(){setTimeout(function(){window.print();},400);}<\/script>'
+  +'</body></html>');
+  w.document.close();
+}
 
 function toast(msg,type,ms){type=type||'in';ms=ms||3400;var w=document.getElementById('toastWrap');if(!w)return;var t=document.createElement('div');var icons={ok:'fa-check-circle',er:'fa-times-circle',wa:'fa-exclamation-triangle',in:'fa-info-circle'};var colors={ok:'#27ae60',er:'#e74c3c',wa:'#e8a020',in:'#2563a8'};t.style.cssText='display:flex;align-items:center;gap:10px;background:#fff;border-radius:10px;padding:12px 16px;margin-bottom:8px;box-shadow:0 4px 20px rgba(0,0,0,.12);border-left:4px solid '+colors[type]+';font-size:13px;max-width:380px';t.innerHTML='<i class="fas '+(icons[type]||'fa-info-circle')+'" style="color:'+colors[type]+'"></i><span>'+esc(msg)+'</span>';w.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},ms);}
 function loading(s){var el=document.getElementById('gLoad');if(el)el.classList.toggle('show',!!s);}
@@ -2068,6 +2148,7 @@ function renderHermanos(el){
     <div class="mod-acts">
       <button class="btn btn-ok btn-sm" onclick="newHerm()"><i class="fas fa-plus"></i> Nuevo</button>
       <button class="btn btn-in btn-sm" onclick="exportXLS(_herm,'Hermanos','hermanos')"><i class="fas fa-file-excel"></i> Excel</button>
+      <button class="btn btn-er btn-sm" onclick="imprimirHermanos()"><i class="fas fa-print"></i> PDF</button>
     </div>
   </div>
   <div style="background:rgba(26,58,92,.07);border:1px solid var(--brd);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px">Codigo: D<b>n</b>Z<b>n</b>A<b>L</b>S<b>n</b>G<b>n</b> Ej:<b>11A11</b></div>
@@ -2636,7 +2717,7 @@ function delDzm(id){customConfirm('¿Eliminar este registro de diezmo/ofrenda?',
 // INVENTARIO & INSUMOS
 // ══════════════════════════════════════════════════════════
 let _inv=[],_ins=[];
-function renderInventario(el){el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-boxes"></i> Inventario</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newInv()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-in btn-sm" onclick="exportXLS(_inv,'Inventario','inventario')"><i class="fas fa-file-excel"></i> Excel</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterInv(this.value)"></div></div><div class="tw"><table><thead><tr><th>Artículo</th><th>Categoría</th><th>Cantidad</th><th>Unidad</th><th>Estado</th><th>Ubicación</th><th>Valor Q</th><th>Acciones</th></tr></thead><tbody id="invTb"></tbody></table></div></div>`;loadInv();}
+function renderInventario(el){el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-boxes"></i> Inventario</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newInv()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-in btn-sm" onclick="exportXLS(_inv,'Inventario','inventario')"><i class="fas fa-file-excel"></i> Excel</button><button class="btn btn-er btn-sm" onclick="imprimirInventario()"><i class="fas fa-print"></i> PDF</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterInv(this.value)"></div></div><div class="tw"><table><thead><tr><th>Artículo</th><th>Categoría</th><th>Cantidad</th><th>Unidad</th><th>Estado</th><th>Ubicación</th><th>Valor Q</th><th>Acciones</th></tr></thead><tbody id="invTb"></tbody></table></div></div>`;loadInv();}
 function loadInv(){call('getInventario',{},(_, d)=>{_inv=Array.isArray(d)?d:[];renderInvTb(_inv);});}
 function renderInvTb(d){const tb=document.getElementById('invTb');if(!tb)return;if(!d.length){tb.innerHTML=`<tr><td colspan="8"><div class="empty-r"><i class="fas fa-boxes"></i><p>Sin artículos</p></div></td></tr>`;return;}tb.innerHTML=d.map(i=>`<tr><td><b>${esc(i['Articulo'])}</b></td><td><span class="bdg bb">${esc(i['Categoria'])}</span></td><td>${i['Cantidad']||0}</td><td>${esc(i['Unidad'])}</td><td><span class="bdg ${i['Estado']==='Bueno'?'bg':i['Estado']==='Regular'?'bo':'br'}">${esc(i['Estado'])}</span></td><td>${esc(i['Ubicacion'])}</td><td>${fmtQ(i['ValorQ'])}</td><td><div class="ab"><button class="ab-btn" style="background:var(--ac);color:#fff" onclick="salidaInv('${esc(i['ID'])}')" title="Salida"><i class="fas fa-sign-out-alt"></i></button><button class="ab-btn ab-ed" onclick="editInv('${esc(i['ID'])}')"><i class="fas fa-edit"></i></button><button class="ab-btn ab-del" onclick="delInv('${esc(i['ID'])}')"><i class="fas fa-trash"></i></button></div></td></tr>`).join('');}
 function filterInv(q){renderInvTb(_inv.filter(i=>JSON.stringify(i).toLowerCase().includes(q.toLowerCase())));}
@@ -2673,7 +2754,7 @@ function confirmSalidaInv(id){
   });
 }
 
-function renderInsumos(el){el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-spray-can"></i> Insumos</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newIns()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-in btn-sm" onclick="exportXLS(_ins,'Insumos','insumos')"><i class="fas fa-file-excel"></i> Excel</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterIns(this.value)"></div></div><div class="tw"><table><thead><tr><th>Artículo</th><th>Categoría</th><th>Cantidad</th><th>Unidad</th><th>Precio Q</th><th>Stock Mín.</th><th>Proveedor</th><th>Acciones</th></tr></thead><tbody id="insTb"></tbody></table></div></div>`;loadIns();}
+function renderInsumos(el){el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-spray-can"></i> Insumos</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newIns()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-in btn-sm" onclick="exportXLS(_ins,'Insumos','insumos')"><i class="fas fa-file-excel"></i> Excel</button><button class="btn btn-er btn-sm" onclick="imprimirInsumos()"><i class="fas fa-print"></i> PDF</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterIns(this.value)"></div></div><div class="tw"><table><thead><tr><th>Artículo</th><th>Categoría</th><th>Cantidad</th><th>Unidad</th><th>Precio Q</th><th>Stock Mín.</th><th>Proveedor</th><th>Acciones</th></tr></thead><tbody id="insTb"></tbody></table></div></div>`;loadIns();}
 function loadIns(){call('getInsumos',{},(_, d)=>{_ins=Array.isArray(d)?d:[];renderInsTb(_ins);});}
 function renderInsTb(d){const tb=document.getElementById('insTb');if(!tb)return;if(!d.length){tb.innerHTML=`<tr><td colspan="8"><div class="empty-r"><i class="fas fa-spray-can"></i><p>Sin insumos</p></div></td></tr>`;return;}tb.innerHTML=d.map(i=>`<tr><td><b>${esc(i['Articulo'])}</b></td><td><span class="bdg bo">${esc(i['Categoria'])}</span></td><td>${i['Cantidad']||0}</td><td>${esc(i['Unidad'])}</td><td>${fmtQ(i['PrecioUnitarioQ'])}</td><td><span class="bdg ${num(i['Cantidad'])>num(i['StockMinimo'])?'bg':'br'}">${i['StockMinimo']||0}</span></td><td>${esc(i['Proveedor'])}</td><td><div class="ab"><button class="ab-btn" style="background:var(--ac);color:#fff" onclick="salidaIns('${esc(i['ID'])}')" title="Salida"><i class="fas fa-sign-out-alt"></i></button><button class="ab-btn ab-ed" onclick="editIns('${esc(i['ID'])}')"><i class="fas fa-edit"></i></button><button class="ab-btn ab-del" onclick="delIns('${esc(i['ID'])}')"><i class="fas fa-trash"></i></button></div></td></tr>`).join('');}
 function filterIns(q){renderInsTb(_ins.filter(i=>JSON.stringify(i).toLowerCase().includes(q.toLowerCase())));}
@@ -4544,7 +4625,7 @@ function enviarBot(){
 // ══════════════════════════════════════════════════════════
 // === MÓDULOS v6 (sin backticks) ===
 var _svs=[],_pas=[],_ayu=[];
-function renderSupervisores(el){el.innerHTML='<div class="mod-hdr"><h2><i class="fas fa-user-shield"></i> Supervisores de Sector</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newSvs()"><i class="fas fa-plus"></i> Nuevo</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterSvs(this.value)"></div></div><div class="tw"><table><thead><tr><th>Codigo</th><th>Nombre</th><th>D</th><th>Z</th><th>A</th><th>S</th><th>Tel</th><th>Estado</th><th></th></tr></thead><tbody id="svsTb"></tbody></table></div></div>';loadSvs();}
+function renderSupervisores(el){el.innerHTML='<div class="mod-hdr"><h2><i class="fas fa-user-shield"></i> Supervisores de Sector</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newSvs()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-er btn-sm" onclick="imprimirSupervisores()"><i class="fas fa-print"></i> PDF</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterSvs(this.value)"></div></div><div class="tw"><table><thead><tr><th>Codigo</th><th>Nombre</th><th>D</th><th>Z</th><th>A</th><th>S</th><th>Tel</th><th>Estado</th><th></th></tr></thead><tbody id="svsTb"></tbody></table></div></div>';loadSvs();}
 function loadSvs(){call('getSupervisores',{},function(_,r){_svs=(r&&r.ok&&r.data)?r.data:[];try{localStorage.setItem('_svs_c',JSON.stringify(_svs.map(function(s){return{c:s['CodigoSup'],n:s['NombreSup']};})));}catch(ex){}renderSvsTb(_svs);});}
 function filterSvs(q){renderSvsTb(q?_svs.filter(function(s){return JSON.stringify(s).toLowerCase().includes(q.toLowerCase());}):_svs);}
 function renderSvsTb(d){var tb=document.getElementById('svsTb');if(!tb)return;if(!d.length){tb.innerHTML='<tr><td colspan="9"><div class="empty-r"><p>Sin supervisores</p></div></td></tr>';return;}tb.innerHTML=d.map(function(s){return '<tr><td><b style="font-family:monospace">'+esc(s['CodigoSup'])+'</b></td><td><b>'+esc(s['NombreSup'])+'</b></td><td>'+esc(s['Distrito']||'')+'</td><td>'+esc(s['Zona']||'')+'</td><td>'+esc(s['Area']||'')+'</td><td>'+esc(s['Sector']||'')+'</td><td>'+esc(s['Telefono']||'')+'</td><td><span class="bdg '+(s['Activo']==='SI'?'bg':'br')+'">'+(s['Activo']==='SI'?'Activo':'Inactivo')+'</span></td><td><div class="ab"><button class="ab-btn ab-ed" onclick="editSvs(\''+esc(s['ID'])+'\')"><i class="fas fa-edit"></i></button><button class="ab-btn ab-del" onclick="delSvs(\''+esc(s['ID'])+'\')"><i class="fas fa-trash"></i></button></div></td></tr>';}).join('');}
@@ -4564,7 +4645,7 @@ function editSvs(id){
 function saveSvs(id){var cod=(document.getElementById('sf_codigo')||{}).value||'',nom=(document.getElementById('sf_nombre')||{}).value||'';if(!nom){toast('Nombre requerido','wa');return;}if(!cod||cod==='??'){toast('Completa 4 campos','wa');return;}loading(true);call('saveSupervisor',{ID:id||'',CodigoSup:cod,NombreSup:nom,Distrito:(document.getElementById('sf_dist')||{}).value||'',Zona:(document.getElementById('sf_zona')||{}).value||'',Area:((document.getElementById('sf_area')||{}).value||'').toUpperCase(),Sector:(document.getElementById('sf_sector')||{}).value||'',Telefono:(document.getElementById('sf_tel')||{}).value||'',Email:(document.getElementById('sf_email')||{}).value||'',Activo:(document.getElementById('sf_act')||{}).value||'SI'},function(_,r){loading(false);if(r&&r.ok){toast('Supervisor: '+cod,'ok',4000);closeModal();loadSvs();}else toast('Error: '+(r&&r.msg||''),'er');});}
 function delSvs(id){customConfirm('Eliminar supervisor?',function(ok){if(!ok)return;call('deleteSupervisor',{id:id},function(_,r){if(r&&r.ok){toast('Eliminado','ok');loadSvs();}});},{icon:'fa-trash',danger:true});}
 
-function renderPastores(el){el.innerHTML='<div class="mod-hdr"><h2><i class="fas fa-church"></i> Pastores de Zona</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newPas()"><i class="fas fa-plus"></i> Nuevo</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterPas(this.value)"></div></div><div class="tw"><table><thead><tr><th>Codigo</th><th>Nombre</th><th>D</th><th>Z</th><th>Tel</th><th>Estado</th><th></th></tr></thead><tbody id="pasTb"></tbody></table></div></div>';loadPas();}
+function renderPastores(el){el.innerHTML='<div class="mod-hdr"><h2><i class="fas fa-church"></i> Pastores de Zona</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newPas()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-er btn-sm" onclick="imprimirPastores()"><i class="fas fa-print"></i> PDF</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterPas(this.value)"></div></div><div class="tw"><table><thead><tr><th>Codigo</th><th>Nombre</th><th>D</th><th>Z</th><th>Tel</th><th>Estado</th><th></th></tr></thead><tbody id="pasTb"></tbody></table></div></div>';loadPas();}
 function loadPas(){call('getPastores',{},function(_,r){_pas=(r&&r.ok&&r.data)?r.data:[];try{localStorage.setItem('_pas_c',JSON.stringify(_pas.map(function(p){return{c:p['CodigoPastor'],n:p['NombrePastor']};})));}catch(ex){}renderPasTb(_pas);});}
 function filterPas(q){renderPasTb(q?_pas.filter(function(p){return JSON.stringify(p).toLowerCase().includes(q.toLowerCase());}):_pas);}
 function renderPasTb(d){var tb=document.getElementById('pasTb');if(!tb)return;if(!d.length){tb.innerHTML='<tr><td colspan="7"><div class="empty-r"><p>Sin pastores</p></div></td></tr>';return;}tb.innerHTML=d.map(function(p){return '<tr><td><b style="font-family:monospace;font-size:16px">'+esc(p['CodigoPastor'])+'</b></td><td><b>'+esc(p['NombrePastor'])+'</b></td><td>'+esc(p['Distrito']||'')+'</td><td>'+esc(p['Zona']||'')+'</td><td>'+esc(p['Telefono']||'')+'</td><td><span class="bdg '+(p['Activo']==='SI'?'bg':'br')+'">'+(p['Activo']==='SI'?'Activo':'Inactivo')+'</span></td><td><div class="ab"><button class="ab-btn ab-ed" onclick="editPas(\''+esc(p['ID'])+'\')"><i class="fas fa-edit"></i></button><button class="ab-btn ab-del" onclick="delPas(\''+esc(p['ID'])+'\')"><i class="fas fa-trash"></i></button></div></td></tr>';}).join('');}
@@ -4593,7 +4674,7 @@ function savePas(id){var cod=(document.getElementById('pf_codigo')||{}).value||'
 function delPas(id){customConfirm('Eliminar pastor?',function(ok){if(!ok)return;call('deletePastor',{id:id},function(_,r){if(r&&r.ok){toast('Eliminado','ok');loadPas();}});},{icon:'fa-trash',danger:true});}
 
 // ── AYUDA DE PASTOR ───────────────────────────────────────────
-function renderAyudaPastor(el){el.innerHTML='<div class="mod-hdr"><h2><i class="fas fa-hands-helping"></i> Ayuda de Pastor</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newAyu()"><i class="fas fa-plus"></i> Nuevo</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterAyu(this.value)"></div></div><div class="tw"><table><thead><tr><th>Codigo</th><th>Nombre</th><th>D</th><th>Z</th><th>A</th><th>Tel</th><th>Estado</th><th></th></tr></thead><tbody id="ayuTb"></tbody></table></div></div>';loadAyu();}
+function renderAyudaPastor(el){el.innerHTML='<div class="mod-hdr"><h2><i class="fas fa-hands-helping"></i> Ayuda de Pastor</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newAyu()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-er btn-sm" onclick="imprimirAyuda()"><i class="fas fa-print"></i> PDF</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterAyu(this.value)"></div></div><div class="tw"><table><thead><tr><th>Codigo</th><th>Nombre</th><th>D</th><th>Z</th><th>A</th><th>Tel</th><th>Estado</th><th></th></tr></thead><tbody id="ayuTb"></tbody></table></div></div>';loadAyu();}
 function loadAyu(){call('getAyudaPastor',{},function(_,r){_ayu=(r&&r.ok&&r.data)?r.data:[];renderAyuTb(_ayu);});}
 function filterAyu(q){renderAyuTb(q?_ayu.filter(function(a){return JSON.stringify(a).toLowerCase().includes(q.toLowerCase());}):_ayu);}
 function renderAyuTb(d){var tb=document.getElementById('ayuTb');if(!tb)return;if(!d.length){tb.innerHTML='<tr><td colspan="8"><div class="empty-r"><p>Sin registros</p></div></td></tr>';return;}tb.innerHTML=d.map(function(a){return '<tr><td><b style="font-family:monospace">'+esc(a['CodigoAyuda'])+'</b></td><td><b>'+esc(a['NombreAyuda'])+'</b></td><td>'+esc(a['Distrito']||'')+'</td><td>'+esc(a['Zona']||'')+'</td><td>'+esc(a['Area']||'')+'</td><td>'+esc(a['Telefono']||'')+'</td><td><span class="bdg '+(a['Activo']==='SI'?'bg':'br')+'">'+(a['Activo']==='SI'?'Activo':'Inactivo')+'</span></td><td><div class="ab"><button class="ab-btn ab-ed" onclick="editAyu(\''+esc(a['ID'])+'\')"><i class="fas fa-edit"></i></button><button class="ab-btn ab-del" onclick="delAyu(\''+esc(a['ID'])+'\')"><i class="fas fa-trash"></i></button></div></td></tr>';}).join('');}
