@@ -972,6 +972,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             reportes = reportes_q.all()
             codigos_reportados = set(r.codigo for r in reportes)
             data, total_lideres, entregaron, pendientes_c, ofrenda_total = [], 0, 0, 0, 0.0
+            pendiente_entrega = 0  # digital enviado pero ofrenda no entregada
             # Agrupar por distrito
             distritos = {}
             for h in lideres:
@@ -979,22 +980,31 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 reporto = h.codigo_lead in codigos_reportados
                 rpts = [r for r in reportes if r.codigo == h.codigo_lead]
                 ofrenda = sum(float(r.ofrenda_total or 0) for r in rpts)
+                # ofrenda recibida solo si algun reporte tiene estado Recibida
+                recibida = any(r.ofrenda_recibida not in ("Pendiente", "", None) for r in rpts)
+                ofrenda_recibida_val = sum(float(r.ofrenda_total or 0) for r in rpts if r.ofrenda_recibida not in ("Pendiente", "", None))
+                if not reporto:
+                    pendientes_c += 1  # sin reporte
+                elif not recibida:
+                    pendiente_entrega += 1  # envio digital pero no entrego
+                else:
+                    entregaron += 1  # ofrenda recibida
                 ofrenda_total += ofrenda
-                if reporto: entregaron += 1
-                else: pendientes_c += 1
                 d = str(h.distrito or "?")
                 z = str(h.zona or "?")
-                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": True if rpts and rpts[0].ofrenda_recibida not in ("Pendiente", "", None) else False, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
+                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": recibida, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
                 data.append(item)
-                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "ofrendaTotal": 0.0, "zonas": {}}
+                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "zonas": {}}
                 distritos[d]["totalLideres"] += 1
-                if reporto: distritos[d]["entregaron"] += 1
-                else: distritos[d]["pendientes"] += 1
+                if not reporto: distritos[d]["pendientes"] += 1
+                elif not recibida: distritos[d]["pendienteEntrega"] += 1
+                else: distritos[d]["entregaron"] += 1
                 distritos[d]["ofrendaTotal"] += ofrenda
-                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "ofrendaTotal": 0.0, "lideres": []}
+                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "lideres": []}
                 distritos[d]["zonas"][z]["totalLideres"] += 1
-                if reporto: distritos[d]["zonas"][z]["entregaron"] += 1
-                else: distritos[d]["zonas"][z]["pendientes"] += 1
+                if not reporto: distritos[d]["zonas"][z]["pendientes"] += 1
+                elif not recibida: distritos[d]["zonas"][z]["pendienteEntrega"] += 1
+                else: distritos[d]["zonas"][z]["entregaron"] += 1
                 distritos[d]["zonas"][z]["ofrendaTotal"] += ofrenda
                 distritos[d]["zonas"][z]["lideres"].append(item)
             # Convertir zonas de dict a lista ordenada
@@ -1010,7 +1020,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 dg["ofrendaTotal"] = round(dg["ofrendaTotal"], 2)
                 distritos_list.append(dg)
             generar_pdf = payload.get("generarPDF", False)
-            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "ofrendaTotal": round(ofrenda_total, 2)}
+            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2)}
             if generar_pdf:
                 try:
                     from fpdf import FPDF
