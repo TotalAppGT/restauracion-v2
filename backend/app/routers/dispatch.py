@@ -260,6 +260,16 @@ def save_entity(db, model_class, field_map, payload, id_key="ID"):
         for key, val in data.items():
             setattr(obj, key, val)
     else:
+        # Auto-resolver codigo unico duplicado (homonimos): agregar sufijo -2, -3...
+        for code_field in ("codigo_ayuda", "codigo_sup", "codigo_pastor", "codigo_lead"):
+            if code_field in data and data[code_field]:
+                base = str(data[code_field])
+                exists = db.query(model_class).filter(getattr(model_class, code_field) == base).first()
+                if exists:
+                    n = 2
+                    while db.query(model_class).filter(getattr(model_class, code_field) == f"{base}-{n}").first():
+                        n += 1
+                    data[code_field] = f"{base}-{n}"
         obj = model_class(**data)
         db.add(obj)
     db.commit()
