@@ -478,7 +478,26 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return [{"ID": r.id, "Codigo": r.codigo, "Lider": r.lider, "Fecha": str(r.fecha) if r.fecha else "", "Distrito": r.distrito, "Zona": r.zona, "Area": r.area, "Sector": r.sector, "Grupo": r.grupo, "Ofrenda Total": float(r.ofrenda_total or 0), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Asistencia Grupo Familiar": r.asistencia or 0, "Hnos": r.hnos or 0, "Amigos": r.amigos or 0, "Niños": r.ninos or 0, "Tipo de Reporte": r.tipo_reporte or "", "Origen": r.reporte_origen or "Fisico", "Sup Sector": r.sup_sector or "", "Sup Area": r.sup_area or "", "Pastor Zona": r.pastor_zona or "", "Anfitrion": r.anfitrion or "", "Direccion": r.direccion or "", "Hora Inicio": r.hora_inicio or "", "Hora Final": r.hora_final or "", "Ofrenda Iglesia": float(r.ofrenda_iglesia or 0), "Ofrenda Bus": float(r.ofrenda_bus or 0), "Total": r.total_cultos or 0, "Martes": r.martes or 0, "Jueves": r.jueves or 0, "Domingo": r.domingo or 0, "Reporte": r.reporte_origen or ""} for r in reportes]
 
         if action == "saveReporte":
-            return save_entity(db, Reporte, REPORTE_MAP, payload)
+            item_id = payload.get("ID") or payload.get("id")
+            data = payload_to_kwargs(REPORTE_MAP, payload)
+            if not item_id:
+                data.pop("id", None)
+            data = {k: v for k, v in data.items() if not (isinstance(v, str) and v.strip() == "")}
+            # Logica de ofrenda: Digital -> Pendiente, Fisico/Manual -> Recibida
+            origen = str(data.get("reporte_origen", "") or "").strip().lower()
+            if origen == "digital":
+                data["ofrenda_recibida"] = "Pendiente"
+            elif origen in ("fisico", "físico", "manual", ""):
+                data["ofrenda_recibida"] = "Recibida"
+            if item_id:
+                obj = db.query(Reporte).filter(Reporte.id == int(item_id)).first()
+                if not obj: return {"ok": False, "msg": "Reporte no encontrado"}
+                for key, val in data.items(): setattr(obj, key, val)
+            else:
+                obj = Reporte(**data)
+                db.add(obj)
+            db.commit()
+            return {"ok": True}
 
         if action == "deleteReporte":
             return delete_entity(db, Reporte, payload)
