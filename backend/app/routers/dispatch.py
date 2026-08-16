@@ -1020,7 +1020,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 dg["ofrendaTotal"] = round(dg["ofrendaTotal"], 2)
                 distritos_list.append(dg)
             generar_pdf = payload.get("generarPDF", False)
-            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2)}
+            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "gruposRealizados": entregaron + pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2)}
             if generar_pdf:
                 try:
                     from fpdf import FPDF
