@@ -6,7 +6,7 @@ from app.models import (
     Supervisor, Pastore, AyudaPastor, Contacto,
     Diezmo, Gasto, Inventario, Insumo, Privilegio,
     Cronograma, Bitacora, Configuracion, Envio, GeneradorReporte, Bautizo,
-    Notificacion, NotificacionLog
+    Notificacion, NotificacionLog, PastorDistrito
 )
 import jwt
 import bcrypt
@@ -157,12 +157,12 @@ ALL_MENU_IDS = [
     'dashboard','reportes','reporteDigital','formulario','generador',
     'hermanos','cargaMasiva','seguimientos','privilegios',
     'diezmos','gastos','cuadre','inventario','insumos','bautizos',
-    'supervisores','pastores','ayudapastor',
+    'supervisores','pastores','pastoresdistrito','ayudapastor',
     'envio','notificaciones','contactos','usuarios','configuracion','bitacora'
 ]
 
 ROL_DEFAULT_MENU = {
-    'Admin':     ['dashboard','reportes','reporteDigital','formulario','generador','hermanos','cargaMasiva','seguimientos','privilegios','diezmos','gastos','cuadre','inventario','insumos','bautizos','envio','notificaciones','contactos','usuarios','supervisores','pastores','ayudapastor','configuracion','bitacora'],
+    'Admin':     ['dashboard','reportes','reporteDigital','formulario','generador','hermanos','cargaMasiva','seguimientos','privilegios','diezmos','gastos','cuadre','inventario','insumos','bautizos','envio','notificaciones','contactos','usuarios','supervisores','pastores','pastoresdistrito','ayudapastor','configuracion','bitacora'],
     'Líder':     ['dashboard','reportes','reporteDigital','formulario','seguimientos'],
     'Secretario':['dashboard','reportes','reporteDigital','generador','seguimientos','envio','contactos'],
     'Tesorero':  ['dashboard','reportes','diezmos','gastos','generador','envio'],
@@ -179,6 +179,7 @@ HERMANO_MAP = {"ID": "id", "CodigoL": "codigo_lead", "NombreL": "nombre", "Distr
 SUPERVISOR_MAP = {"ID": "id", "CodigoSup": "codigo_sup", "NombreSup": "nombre_sup", "Distrito": "distrito", "Zona": "zona", "Area": "area", "Sector": "sector", "Telefono": "telefono", "Email": "email", "Activo": "activo"}
 PASTOR_MAP = {"ID": "id", "CodigoPastor": "codigo_pastor", "NombrePastor": "nombre_pastor", "Distrito": "distrito", "Zona": "zona", "Telefono": "telefono", "Email": "email", "Activo": "activo"}
 AYUDA_PASTOR_MAP = {"ID": "id", "CodigoAyuda": "codigo_ayuda", "NombreAyuda": "nombre_ayuda", "Distrito": "distrito", "Zona": "zona", "Area": "area", "Telefono": "telefono", "Email": "email", "Activo": "activo"}
+PASTOR_DISTRITO_MAP = {"ID": "id", "CodigoPastorDistrito": "codigo_pastor_distrito", "NombrePastorDistrito": "nombre_pastor_distrito", "Distrito": "distrito", "Telefono": "telefono", "Email": "email", "Direccion": "direccion", "Activo": "activo"}
 CONTACTO_MAP = {"ID": "id", "Nombre": "nombre", "Correo": "email", "WhatsApp": "telefono", "Telefono": "telefono", "Direccion": "direccion", "Notas": "notas", "Activo": "activo"}
 DIEZMO_MAP = {"ID": "id", "Fecha": "fecha", "Nombre": "nombre", "Telefono": "telefono", "Grupo": "grupo", "Tipo": "tipo", "MontoQ": "monto", "Descripcion": "observaciones"}
 INVENTARIO_MAP = {"ID": "id", "Articulo": "nombre", "Categoria": "categoria", "Cantidad": "cantidad", "Unidad": "unidad", "Estado": "estado", "Ubicacion": "ubicacion", "ValorQ": "valor_q", "Observaciones": "observaciones"}
@@ -706,6 +707,15 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         if action == "deleteAyudaPastor":
             return delete_entity(db, AyudaPastor, payload)
+
+        if action == "getPastoresDistrito":
+            return {"ok": True, "data": [db_to_gas(p, PASTOR_DISTRITO_MAP) for p in db.query(PastorDistrito).all()]}
+
+        if action == "savePastorDistrito":
+            return save_entity(db, PastorDistrito, PASTOR_DISTRITO_MAP, payload)
+
+        if action == "deletePastorDistrito":
+            return delete_entity(db, PastorDistrito, payload)
 
         # ── CONTACTOS (raw array) ──
         if action == "getContactos":

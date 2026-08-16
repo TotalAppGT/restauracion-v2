@@ -122,6 +122,23 @@ try:
             conn.commit()
         except Exception:
             pass
+        # Asegurar tabla pastores_distrito
+        try:
+            conn.execute(text("""
+                CREATE TABLE IF NOT EXISTS pastores_distrito (
+                    id SERIAL PRIMARY KEY,
+                    codigo_pastor_distrito VARCHAR(50) UNIQUE,
+                    nombre_pastor_distrito VARCHAR(200),
+                    distrito VARCHAR(10),
+                    telefono VARCHAR(50),
+                    email VARCHAR(200),
+                    direccion TEXT,
+                    activo BOOLEAN DEFAULT TRUE
+                )
+            """))
+            conn.commit()
+        except Exception:
+            pass
         conn.commit()
 except Exception as e:
     print(f"⚠️ Migración: {e}")

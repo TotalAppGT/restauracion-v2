@@ -104,6 +104,17 @@ class Pastore(Base):
     direccion = Column(Text)
     activo = Column(Boolean, default=True)
 
+class PastorDistrito(Base):
+    __tablename__ = "pastores_distrito"
+    id = Column(Integer, primary_key=True, index=True)
+    codigo_pastor_distrito = Column(String(50), unique=True, index=True)
+    nombre_pastor_distrito = Column(String(200))
+    distrito = Column(String(10))
+    telefono = Column(String(50))
+    email = Column(String(200))
+    direccion = Column(Text)
+    activo = Column(Boolean, default=True)
+
 class AyudaPastor(Base):
     __tablename__ = "ayuda_pastor"
     id = Column(Integer, primary_key=True, index=True)
