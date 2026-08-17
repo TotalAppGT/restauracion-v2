@@ -1559,6 +1559,92 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 except: pass
             return result
 
+        # ── INFORME DETALLADO (por distrito/zona/lider) ──
+        if action == "generarInformeDetallado":
+            desde = payload.get("desde", "").strip()
+            hasta = payload.get("hasta", "").strip()
+            distrito = payload.get("distrito", "").strip()
+            zona = payload.get("zona", "").strip()
+            tipo = payload.get("tipo", "Informe Detallado de Grupos").strip()
+            q = db.query(Reporte)
+            if desde:
+                try:
+                    d = datetime.strptime(desde, "%Y-%m-%d").date(); q = q.filter(Reporte.fecha >= d)
+                except: pass
+            if hasta:
+                try:
+                    d = datetime.strptime(hasta, "%Y-%m-%d").date(); q = q.filter(Reporte.fecha <= d)
+                except: pass
+            if distrito: q = q.filter(Reporte.distrito == distrito)
+            if zona: q = q.filter(Reporte.zona == zona)
+            reportes = q.order_by(Reporte.distrito, Reporte.zona, Reporte.codigo, Reporte.fecha).all()
+            if not reportes:
+                return {"ok": False, "msg": "No se encontraron reportes en el periodo seleccionado"}
+            # Agrupar por distrito -> zona -> lider
+            distritos = {}
+            total_asist = 0; total_hnos = 0; total_amg = 0; total_ninos = 0; total_of = 0.0; total_rptes = 0
+            for r in reportes:
+                dk = str(r.distrito or "?"); zk = str(r.zona or "?"); ck = r.codigo or "?"
+                if dk not in distritos: distritos[dk] = {"distrito": dk, "zonas": {}, "asistencia": 0, "ofrenda": 0.0, "reportes": 0}
+                if zk not in distritos[dk]["zonas"]: distritos[dk]["zonas"][zk] = {"zona": zk, "lideres": {}, "asistencia": 0, "ofrenda": 0.0, "reportes": 0}
+                if ck not in distritos[dk]["zonas"][zk]["lideres"]:
+                    distritos[dk]["zonas"][zk]["lideres"][ck] = {"codigo": ck, "nombre": r.lider or "", "pastor": r.pastor_zona or "", "supervisor": r.sup_sector or "", "reportes": [], "asistencia": 0, "hnos": 0, "amigos": 0, "ninos": 0, "ofrenda": 0.0}
+                lid = distritos[dk]["zonas"][zk]["lideres"][ck]
+                of = float(r.ofrenda_total or 0)
+                lid["reportes"].append({"fecha": str(r.fecha) if r.fecha else "", "tipo": r.tipo_reporte or "Mixta", "origen": r.reporte_origen or "Fisico", "asistencia": r.asistencia or 0, "hnos": r.hnos or 0, "amigos": r.amigos or 0, "ninos": r.ninos or 0, "ofrenda": round(of, 2), "estado": r.ofrenda_recibida or "Pendiente"})
+                lid["asistencia"] += r.asistencia or 0; lid["hnos"] += r.hnos or 0; lid["amigos"] += r.amigos or 0; lid["ninos"] += r.ninos or 0; lid["ofrenda"] += of
+                distritos[dk]["zonas"][zk]["asistencia"] += r.asistencia or 0
+                distritos[dk]["zonas"][zk]["ofrenda"] += of
+                distritos[dk]["zonas"][zk]["reportes"] += 1
+                distritos[dk]["asistencia"] += r.asistencia or 0
+                distritos[dk]["ofrenda"] += of
+                distritos[dk]["reportes"] += 1
+                total_asist += r.asistencia or 0; total_hnos += r.hnos or 0; total_amg += r.amigos or 0; total_ninos += r.ninos or 0; total_of += of; total_rptes += 1
+            # Construir HTML detallado
+            fecha_gen = datetime.now().strftime('%d/%m/%Y %I:%M %p')
+            sys_nom = ""
+            try:
+                c = db.query(Configuracion).filter(Configuracion.clave == "nombre").first()
+                if c: sys_nom = c.valor
+            except: pass
+            body_html = ""
+            for dk in sorted(distritos.keys()):
+                dg = distritos[dk]
+                body_html += f'<div style="margin:14px 0;border:1px solid #d0d8e8;border-radius:10px;overflow:hidden">'
+                body_html += f'<div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:10px 14px;font-weight:800">{esc("Distrito "+dk)} — {dg["reportes"]} reportes · {dg["asistencia"]} asist. · Q{dg["ofrenda"]:,.2f}</div>'
+                for zk in sorted(dg["zonas"].keys()):
+                    zg = dg["zonas"][zk]
+                    body_html += f'<div style="background:#eef2f8;padding:8px 14px;font-weight:700;color:#1a3a5c">Zona {esc(zk)} — {zg["reportes"]} reportes · Q{zg["ofrenda"]:,.2f}</div>'
+                    body_html += '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a3a5c;color:#fff"><th style="padding:6px 8px;text-align:left">Código</th><th style="text-align:left">Líder</th><th style="text-align:center">Reuniones</th><th style="text-align:center">AGF</th><th style="text-align:center">Hnos</th><th style="text-align:center">Amg</th><th style="text-align:center">Niñ</th><th style="text-align:right">Ofrenda</th></tr></thead><tbody>'
+                    for ck in sorted(zg["lideres"].keys()):
+                        lid = zg["lideres"][ck]
+                        body_html += f'<tr style="border-bottom:1px solid #eef0f5"><td style="padding:6px 8px;font-family:monospace;font-weight:700">{esc(lid["codigo"])}</td><td><b>{esc(lid["nombre"])}</b><br><span style="font-size:10px;color:#666">{esc(lid["pastor"])} · {esc(lid["supervisor"])}</span></td><td style="text-align:center">{len(lid["reportes"])}</td><td style="text-align:center"><b>{lid["asistencia"]}</b></td><td style="text-align:center">{lid["hnos"]}</td><td style="text-align:center">{lid["amigos"]}</td><td style="text-align:center">{lid["ninos"]}</td><td style="text-align:right;font-weight:800;color:#c87f00">Q{lid["ofrenda"]:,.2f}</td></tr>'
+                    body_html += '</tbody></table>'
+                body_html += '</div>'
+            html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>{esc(sys_nom or 'Iglesia Restauracion')} — {esc(tipo)}</title>
+            <style>@page{{size:letter;margin:0.4in}}body{{font-family:Arial,sans-serif;background:#f5f6fa;color:#222;padding:0}}
+            .hdr{{background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:16px 20px;border-radius:10px;-webkit-print-color-adjust:exact}}
+            .hdr h1{{margin:0;font-size:20px}}.hdr .sub{{font-size:12px;opacity:.85;margin-top:3px}}
+            .kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0}}
+            .kpi{{background:#fff;border-radius:8px;padding:10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:3px solid #2563a8}}
+            .kpi .v{{font-size:18px;font-weight:900;color:#1a3a5c}}.kpi .l{{font-size:10px;color:#777;text-transform:uppercase}}
+            @media print{{body{{background:#fff}}}}</style></head><body>
+            <div class="hdr"><h1>{esc(sys_nom or 'Iglesia Restauracion')}</h1><div class="sub">{esc(tipo)} · {desde or 'Inicio'} → {hasta or 'Hoy'} · {fecha_gen}</div></div>
+            <div class="kpis"><div class="kpi"><div class="v">{total_rptes}</div><div class="l">Reportes</div></div><div class="kpi"><div class="v">{total_asist}</div><div class="l">Asistencia</div></div><div class="kpi"><div class="v">{total_hnos}</div><div class="l">Hermanos</div></div><div class="kpi"><div class="v">{total_amg}</div><div class="l">Amigos</div></div><div class="kpi"><div class="v">Q{total_of:,.2f}</div><div class="l">Ofrenda</div></div></div>
+            {body_html}
+            <div style="margin-top:14px;font-size:10px;color:#888;text-align:center">{esc(sys_nom or 'Iglesia Restauracion')} · iglesiarestauracion.totalappgt.online</div>
+            </body></html>"""
+            # Datos planos para XLSX
+            filas_xlsx = []
+            for dk in sorted(distritos.keys()):
+                dg = distritos[dk]
+                for zk in sorted(dg["zonas"].keys()):
+                    zg = dg["zonas"][zk]
+                    for ck in sorted(zg["lideres"].keys()):
+                        lid = zg["lideres"][ck]
+                        filas_xlsx.append({"Distrito": dk, "Zona": zk, "Codigo": lid["codigo"], "Lider": lid["nombre"], "Pastor Zona": lid["pastor"], "Supervisor": lid["supervisor"], "Reuniones": len(lid["reportes"]), "Asistencia": lid["asistencia"], "Hermanos": lid["hnos"], "Amigos": lid["amigos"], "Ninos": lid["ninos"], "Ofrenda": round(lid["ofrenda"], 2)})
+            return {"ok": True, "html": html, "data": filas_xlsx, "titulo": tipo, "resumen": {"reportes": total_rptes, "asistencia": total_asist, "hermanos": total_hnos, "amigos": total_amg, "ninos": total_ninos, "ofrenda": round(total_of, 2)}}
+
         # ── WHATSAPP ──
         if action == "sendWhatsapp":
             from app.whatsapp_utils import send_whatsapp, send_whatsapp_bulk, send_whatsapp_template
