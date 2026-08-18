@@ -1886,49 +1886,20 @@ function imprimirInformeDetallado(){
 }
 function descargarInformeXLSX(){
   if(!_informeDatos){toast('Genera el informe primero','wa');return;}
-  var D=_informeDatos;
-  var COLS=['inicio','nuevo','cerrado','cubierto','total','hechos','no_hechos','adultos','ninos','conv_gru','conv_igle','visitas','bautizados','rec_gru','rec_igle'];
-  var HDR1=['INICIO','NUEVO','CERRADO','CUBIERTO','TOTAL','HECHOS','NO HECHOS','ADULTOS','NIÑOS','CONV. GRU.','CONV. IGLE','VISITAS P.','BAUTIZADOS','REC. GRU.','REC. IGLE.'];
-  var aoa=[];
-  aoa.push(['IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL','','','','','','','','','','','','','','','TRIMESTRE',D.trimestre]);
-  aoa.push(['REPORTE SEMANAL DE GRUPOS FAMILIARES']);
-  aoa.push(['FECHA','','','','','','','','','','','','','','','SEMANA',D.semana]);
-  aoa.push([D.fecha]);
-  aoa.push([]);
-  aoa.push(['','','INFORME DE GRUPOS','','','','','','ASISTENCIA','','FRUTOS']);
-  aoa.push(['',''].concat(HDR1));
-  aoa.push(['ZONA','PASTOR DE ZONA'].concat(HDR1));
-  (D.filas||[]).forEach(function(f){
-    var row=[f.zona,f.pastor];
-    COLS.forEach(function(c){row.push(f[c]);});
-    aoa.push(row);
-  });
-  (D.distritos||[]).forEach(function(dt){
-    var row=['DISTRITO '+dt.distrito,''];
-    COLS.forEach(function(c){row.push(dt[c]);});
-    aoa.push(row);
-  });
-  var tg=D.total||{};
-  (function(){var row=['TOTAL GENERAL',''];COLS.forEach(function(c){row.push(tg[c]);});aoa.push(row);})();
-  aoa.push([]);
-  var m=D.meta||{};
-  aoa.push(['PASTOR NELSON'===(D.pastorPrincipal)?D.pastorPrincipal:D.pastorPrincipal,'ADULTOS','NIÑOS','TOTAL','SEMANA ANTERIOR','','','SEMANA PRESENTE','','','%']);
-  aoa.push(['META ASISTENCIA',m.adultos,m.ninos,m.total,'ADULTO','NIÑOS','TOTAL','ADULTOS','NIÑOS','TOTAL',m.pct+'%']);
-  aoa.push(['', '', '', '', m.antAdultos,m.antNinos,m.antTotal,m.preAdultos,m.preNinos,m.preTotal,'']);
-  var ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!merges']=[
-    {s:{r:0,c:0},e:{r:0,c:14}},
-    {s:{r:1,c:0},e:{r:1,c:14}},
-    {s:{r:5,c:2},e:{r:5,c:8}},
-    {s:{r:5,c:9},e:{r:5,c:10}},
-    {s:{r:5,c:11},e:{r:5,c:16}},
-    {s:{r:9,c:0},e:{r:9,c:1}},
-    {s:{r:10,c:0},e:{r:10,c:1}},
-    {s:{r:11,c:0},e:{r:11,c:1}}
-  ];
-  var wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,ws,'Informe Semanal');
-  XLSX.writeFile(wb,'Informe_Semanal_Grupos_Familiares.xlsx');
+  var b64=_informeDatos.xlsx_base64;
+  if(b64){
+    var bin=atob(b64);
+    var bytes=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    var blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Informe_Semanal_Grupos_Familiares.xlsx';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+  } else {
+    toast('XLSX no disponible, genera el informe nuevamente','er');
+  }
 }
 
 // ── CARGA EL REPOSITORIO DE REPORTES GENERADOS ────────────────

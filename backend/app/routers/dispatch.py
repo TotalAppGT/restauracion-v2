@@ -33,6 +33,124 @@ def _htmlesc(s):
     """Escape HTML entities. Separada de esc() para evitar conflicto con variable local en dispatch()."""
     return str(s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 
+def _informe_xlsx_base64(filas, distritos, total, meta, sys_nom, tipo, fecha_txt, trimestre, semana, pastor_principal):
+    """Genera el XLSX del informe semanal con bordes y estilos (openpyxl) y lo devuelve en base64."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Informe Semanal"
+
+    thin = Side(style="thin", color="000000")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_al = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    header_fill = PatternFill("solid", fgColor="D9E2F3")
+    sub_fill = PatternFill("solid", fgColor="EDF2FA")
+    total_fill = PatternFill("solid", fgColor="FCE4D6")
+
+    HDR1 = ["INICIO","NUEVO","CERRADO","CUBIERTO","TOTAL","HECHOS","NO HECHOS","ADULTOS","NIÑOS","CONV. GRU.","CONV. IGLE","VISITAS P.","BAUTIZADOS","REC. GRU.","REC. IGLE."]
+    COLS = ["inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"]
+
+    def setv(r, c, v, bold=False, align=None, fill=None, bd=True):
+        cell = ws.cell(row=r, column=c, value=v)
+        cell.font = Font(bold=bold)
+        cell.alignment = align or (center if isinstance(v, (int, float)) else left_al)
+        if bd: cell.border = border
+        if fill: cell.fill = fill
+        return cell
+
+    # Bloque de título (sin bordes)
+    ws.merge_cells("A1:O1"); setv(1, 1, (sys_nom or "IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL").upper(), bold=True, align=center, bd=False)
+    setv(1, 16, "TRIMESTRE", bold=True, align=center, bd=False); setv(1, 17, trimestre, bold=True, align=center, bd=False)
+    ws.merge_cells("A2:O2"); setv(2, 1, tipo, bold=True, align=center, bd=False)
+    setv(3, 1, "FECHA", bold=True, align=left_al, bd=False)
+    setv(3, 16, "SEMANA", bold=True, align=center, bd=False); setv(3, 17, semana, bold=True, align=center, bd=False)
+    ws.merge_cells("A4:O4"); setv(4, 1, fecha_txt, align=center, bd=False)
+
+    # Encabezados de grupo (fila 6)
+    setv(6, 1, "", bd=False); setv(6, 2, "", bd=False)
+    ws.merge_cells("C6:I6"); setv(6, 3, "INFORME DE GRUPOS", bold=True, align=center)
+    ws.merge_cells("J6:K6"); setv(6, 10, "ASISTENCIA", bold=True, align=center)
+    ws.merge_cells("L6:Q6"); setv(6, 12, "FRUTOS", bold=True, align=center)
+
+    # Sub-encabezados (fila 7)
+    setv(7, 1, "ZONA", bold=True, align=center, fill=header_fill)
+    setv(7, 2, "PASTOR DE ZONA", bold=True, align=center, fill=header_fill)
+    for i, h in enumerate(HDR1):
+        setv(7, 3 + i, h, bold=True, align=center, fill=header_fill)
+
+    r = 8
+    for f in filas:
+        setv(r, 1, f["zona"], align=center)
+        setv(r, 2, f["pastor"], align=left_al)
+        for i, c in enumerate(COLS):
+            v = f[c]
+            if v == 0: v = None
+            setv(r, 3 + i, v, align=center, bold=(c == "total"))
+        r += 1
+
+    for dt in distritos:
+        setv(r, 1, "DISTRITO " + str(dt.get("distrito", "")), bold=True, align=left_al, fill=sub_fill)
+        setv(r, 2, dt.get("pastor_distrito", ""), bold=True, align=left_al, fill=sub_fill)
+        for i, c in enumerate(COLS):
+            v = dt[c]
+            if v == 0: v = None
+            setv(r, 3 + i, v, bold=True, align=center, fill=sub_fill)
+        r += 1
+
+    setv(r, 1, "TOTAL GENERAL", bold=True, align=left_al, fill=total_fill)
+    setv(r, 2, "", fill=total_fill)
+    for i, c in enumerate(COLS):
+        v = total[c]
+        if v == 0: v = None
+        setv(r, 3 + i, v, bold=True, align=center, fill=total_fill)
+    r += 2
+
+    # Sección META
+    mr = r
+    setv(mr, 1, pastor_principal, bold=True, align=left_al)
+    setv(mr, 2, "ADULTOS", bold=True, align=center)
+    setv(mr, 3, "NIÑOS", bold=True, align=center)
+    setv(mr, 4, "TOTAL", bold=True, align=center)
+    ws.merge_cells(start_row=mr, start_column=5, end_row=mr, end_column=7); setv(mr, 5, "SEMANA ANTERIOR", bold=True, align=center)
+    ws.merge_cells(start_row=mr, start_column=8, end_row=mr, end_column=10); setv(mr, 8, "SEMANA PRESENTE", bold=True, align=center)
+    setv(mr, 11, "%", bold=True, align=center)
+    mr += 1
+    setv(mr, 1, "META ASISTENCIA", bold=True, align=left_al)
+    setv(mr, 2, meta.get("adultos", 0), align=center)
+    setv(mr, 3, meta.get("ninos", 0), align=center)
+    setv(mr, 4, meta.get("total", 0), align=center)
+    setv(mr, 5, "ADULTO", bold=True, align=center)
+    setv(mr, 6, "NIÑOS", bold=True, align=center)
+    setv(mr, 7, "TOTAL", bold=True, align=center)
+    setv(mr, 8, "ADULTOS", bold=True, align=center)
+    setv(mr, 9, "NIÑOS", bold=True, align=center)
+    setv(mr, 10, "TOTAL", bold=True, align=center)
+    setv(mr, 11, str(meta.get("pct", 0)) + "%", align=center)
+    mr += 1
+    setv(mr, 1, "")
+    setv(mr, 2, None); setv(mr, 3, None); setv(mr, 4, None)
+    setv(mr, 5, meta.get("antAdultos", 0), align=center)
+    setv(mr, 6, meta.get("antNinos", 0), align=center)
+    setv(mr, 7, meta.get("antTotal", 0), align=center)
+    setv(mr, 8, meta.get("preAdultos", 0), align=center)
+    setv(mr, 9, meta.get("preNinos", 0), align=center)
+    setv(mr, 10, meta.get("preTotal", 0), align=center)
+    setv(mr, 11, "")
+
+    ws.column_dimensions["A"].width = 9
+    ws.column_dimensions["B"].width = 24
+    for col in range(3, 18):
+        ws.column_dimensions[get_column_letter(col)].width = 10
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
 def _get_church_name(db):
     """Obtiene el nombre de la iglesia desde config, con fallback."""
     try:
@@ -1627,6 +1745,12 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 if k in zonas and p.nombre_pastor:
                     zonas[k]["pastor_zona"] = str(p.nombre_pastor).strip()
 
+            # Pastores de distrito -> nombre (tabla pastores_distrito)
+            pastor_distrito_map = {}
+            for pd_ in db.query(PastorDistrito).all():
+                if pd_.nombre_pastor_distrito:
+                    pastor_distrito_map[str(pd_.distrito or "").strip()] = str(pd_.nombre_pastor_distrito).strip()
+
             # Codigos que ya reportaron antes del periodo (para calcular NUEVO)
             codigos_antes = set()
             if d_desde:
@@ -1702,6 +1826,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             tg["rec_gru"] += frutos_global["rec"]
             tg["visitas"] += frutos_global["vis"]
 
+            # Nombre de pastor de distrito por distrito
+            dist_list = []
+            for dk in sorted(dist_tot.keys(), key=lambda x: (int(x) if x.isdigit() else 99999, x)):
+                dt = dist_tot[dk]
+                dt["pastor_distrito"] = pastor_distrito_map.get(dk, "")
+                dist_list.append(dt)
+
             # Meta / semana anterior / presente
             pre_adultos = tg["adultos"]; pre_ninos = tg["ninos"]; pre_total = pre_adultos + pre_ninos
             ant_adultos = ant_ninos = 0
@@ -1741,7 +1872,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             # Filas de distrito
             for d in sorted(dist_tot.keys(), key=lambda x: (int(x) if x.isdigit() else 99999, x)):
                 dt = dist_tot[d]
-                tds = [f'<td colspan="2" style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0;font-weight:800;background:#e8edf5">DISTRITO {esc(d)}</td>']
+                pd_nombre = pastor_distrito_map.get(d, "")
+                pd_html = f'<br><span style="font-size:8.5px;font-weight:600;color:#2c4a6e">{esc(pd_nombre)}</span>' if pd_nombre else ''
+                tds = [f'<td colspan="2" style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0;font-weight:800;background:#e8edf5">DISTRITO {esc(d)}{pd_html}</td>']
                 for c in COLS:
                     tds.append(cell(dt[c], bold=True))
                 body.append('<tr>' + ''.join(tds) + '</tr>')
@@ -1780,10 +1913,16 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             <div style="margin-top:12px;font-size:9px;color:#888;text-align:center">{esc(sys_nom)} · generado {fecha_gen}</div>
             </body></html>"""
 
+            xlsx_base64 = ""
+            try:
+                xlsx_base64 = _informe_xlsx_base64(filas, dist_list, tg, {"adultos": meta_adultos, "ninos": meta_ninos, "total": meta_total, "antAdultos": ant_adultos, "antNinos": ant_ninos, "antTotal": ant_total, "preAdultos": pre_adultos, "preNinos": pre_ninos, "preTotal": pre_total, "pct": pct}, sys_nom, tipo, fecha_txt, trimestre, semana, pastor_principal)
+            except Exception as e:
+                print(f"XLSX informe fallo: {e}")
+
             return {"ok": True, "html": html, "titulo": tipo, "fecha": fecha_txt, "trimestre": trimestre, "semana": semana,
-                    "pastorPrincipal": pastor_principal,
+                    "pastorPrincipal": pastor_principal, "xlsx_base64": xlsx_base64,
                     "meta": {"adultos": meta_adultos, "ninos": meta_ninos, "total": meta_total, "antAdultos": ant_adultos, "antNinos": ant_ninos, "antTotal": ant_total, "preAdultos": pre_adultos, "preNinos": pre_ninos, "preTotal": pre_total, "pct": pct},
-                    "filas": filas, "distritos": list(dist_tot.values()), "total": tg}
+                    "filas": filas, "distritos": dist_list, "total": tg}
 
         # ── WHATSAPP ──
         if action == "sendWhatsapp":
