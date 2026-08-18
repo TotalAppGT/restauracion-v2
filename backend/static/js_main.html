@@ -1843,14 +1843,14 @@ function setInformePeriodo(){
   if(custom)custom.style.display=(p==='personalizado')?'flex':'none';
   if(p!=='personalizado'){return;}
 }
-var _informeHTML='';var _informeData=[];
+var _informeHTML='';var _informeData=[];var _informeDatos=null;
 function generarInformeDetallado(){
   var p=document.getElementById('idPeriodo')?.value||'mes';
   var desde=document.getElementById('idDesde')?.value||'';
   var hasta=document.getElementById('idHasta')?.value||'';
   var distrito=document.getElementById('idDist')?.value||'';
   var zona=document.getElementById('idZona')?.value||'';
-  var titulo=document.getElementById('idTitulo')?.value||'Informe Detallado de Grupos';
+  var titulo=document.getElementById('idTitulo')?.value||'REPORTE SEMANAL DE GRUPOS FAMILIARES';
   if(p==='semana'){var h=new Date();var d=h.getDay();var dif=d===0?-6:1-d;var l=new Date(h);l.setDate(h.getDate()+dif);desde=l.toISOString().split('T')[0];var dom=new Date(l);dom.setDate(l.getDate()+6);hasta=dom.toISOString().split('T')[0];}
   else if(p==='mes'){var h2=new Date();desde=new Date(h2.getFullYear(),h2.getMonth(),1).toISOString().split('T')[0];hasta=new Date(h2.getFullYear(),h2.getMonth()+1,0).toISOString().split('T')[0];}
   else if(p==='trimestre'){var h3=new Date();var qIni=Math.floor(h3.getMonth()/3)*3;desde=new Date(h3.getFullYear(),qIni,1).toISOString().split('T')[0];hasta=new Date(h3.getFullYear(),qIni+3,0).toISOString().split('T')[0];}
@@ -1858,10 +1858,10 @@ function generarInformeDetallado(){
   call('generarInformeDetallado',{desde:desde,hasta:hasta,distrito:distrito,zona:zona,tipo:titulo},function(_,res){
     loading(false);
     if(!res||!res.ok){toast(res&&res.msg||'Error generando informe','er');return;}
-    _informeHTML=res.html||'';_informeData=res.data||[];
+    _informeHTML=res.html||'';_informeData=res.data||[];_informeDatos=res;
     var prev=document.getElementById('idPreview');
     if(prev){var ifr=document.createElement('iframe');ifr.style='width:100%;height:600px;border:none;border-radius:8px';prev.innerHTML='';prev.appendChild(ifr);ifr.contentDocument.open();ifr.contentDocument.write(res.html);ifr.contentDocument.close();}
-    toast('Informe generado: '+_informeData.length+' lideres','ok');
+    toast('Informe generado: '+((res.filas||[]).length)+' zonas','ok');
   });
 }
 function imprimirInformeDetallado(){
@@ -1869,8 +1869,50 @@ function imprimirInformeDetallado(){
   abrirVentanaImpresion(_informeHTML);
 }
 function descargarInformeXLSX(){
-  if(!_informeData||!_informeData.length){toast('Genera el informe primero','wa');return;}
-  exportXLS(_informeData,'Informe Detallado','informe_detallado');
+  if(!_informeDatos){toast('Genera el informe primero','wa');return;}
+  var D=_informeDatos;
+  var COLS=['inicio','nuevo','cerrado','cubierto','total','hechos','no_hechos','adultos','ninos','conv_gru','conv_igle','visitas','bautizados','rec_gru','rec_igle'];
+  var HDR1=['INICIO','NUEVO','CERRADO','CUBIERTO','TOTAL','HECHOS','NO HECHOS','ADULTOS','NIÑOS','CONV. GRU.','CONV. IGLE','VISITAS P.','BAUTIZADOS','REC. GRU.','REC. IGLE.'];
+  var aoa=[];
+  aoa.push(['IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL','','','','','','','','','','','','','','','TRIMESTRE',D.trimestre]);
+  aoa.push(['REPORTE SEMANAL DE GRUPOS FAMILIARES']);
+  aoa.push(['FECHA','','','','','','','','','','','','','','','SEMANA',D.semana]);
+  aoa.push([D.fecha]);
+  aoa.push([]);
+  aoa.push(['','','INFORME DE GRUPOS','','','','','','ASISTENCIA','','FRUTOS']);
+  aoa.push(['',''].concat(HDR1));
+  aoa.push(['ZONA','PASTOR DE ZONA'].concat(HDR1));
+  (D.filas||[]).forEach(function(f){
+    var row=[f.zona,f.pastor];
+    COLS.forEach(function(c){row.push(f[c]);});
+    aoa.push(row);
+  });
+  (D.distritos||[]).forEach(function(dt){
+    var row=['DISTRITO '+dt.distrito,''];
+    COLS.forEach(function(c){row.push(dt[c]);});
+    aoa.push(row);
+  });
+  var tg=D.total||{};
+  (function(){var row=['TOTAL GENERAL',''];COLS.forEach(function(c){row.push(tg[c]);});aoa.push(row);})();
+  aoa.push([]);
+  var m=D.meta||{};
+  aoa.push(['PASTOR NELSON'===(D.pastorPrincipal)?D.pastorPrincipal:D.pastorPrincipal,'ADULTOS','NIÑOS','TOTAL','SEMANA ANTERIOR','','','SEMANA PRESENTE','','','%']);
+  aoa.push(['META ASISTENCIA',m.adultos,m.ninos,m.total,'ADULTO','NIÑOS','TOTAL','ADULTOS','NIÑOS','TOTAL',m.pct+'%']);
+  aoa.push(['', '', '', '', m.antAdultos,m.antNinos,m.antTotal,m.preAdultos,m.preNinos,m.preTotal,'']);
+  var ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges']=[
+    {s:{r:0,c:0},e:{r:0,c:14}},
+    {s:{r:1,c:0},e:{r:1,c:14}},
+    {s:{r:5,c:2},e:{r:5,c:8}},
+    {s:{r:5,c:9},e:{r:5,c:10}},
+    {s:{r:5,c:11},e:{r:5,c:16}},
+    {s:{r:9,c:0},e:{r:9,c:1}},
+    {s:{r:10,c:0},e:{r:10,c:1}},
+    {s:{r:11,c:0},e:{r:11,c:1}}
+  ];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Informe Semanal');
+  XLSX.writeFile(wb,'Informe_Semanal_Grupos_Familiares.xlsx');
 }
 
 // ── CARGA EL REPOSITORIO DE REPORTES GENERADOS ────────────────
@@ -3917,6 +3959,17 @@ function renderConfiguracion(el){
     </div>
   </div>
 
+  <!-- INFORME SEMANAL -->
+  <div class="cfg-section">
+    <div class="cfg-section-title"><i class="fas fa-file-alt"></i> Informe Semanal de Grupos Familiares</div>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:12px">Datos para el módulo <b>Informe Detallado</b> (meta de asistencia y pastor principal).</p>
+    <div class="fg2">
+      <div class="fgg"><label>Pastor Principal</label><input class="fc" id="cfgPastorPrincipal" value="${esc(cfg.pastor_principal||'PASTOR NELSON')}" placeholder="PASTOR NELSON"></div>
+      <div class="fgg"><label>Meta Asistencia — Adultos</label><input class="fc" type="number" min="0" id="cfgMetaAdultos" value="${esc(cfg.meta_asistencia_adultos||'1950')}" placeholder="1950"></div>
+      <div class="fgg"><label>Meta Asistencia — Niños</label><input class="fc" type="number" min="0" id="cfgMetaNinos" value="${esc(cfg.meta_asistencia_ninos||'820')}" placeholder="820"></div>
+    </div>
+  </div>
+
   <!-- DÍAS Y HORARIOS DE SERVICIOS DINÁMICO -->
   <div class="cfg-section">
     <div class="cfg-section-title"><i class="fas fa-calendar-check"></i> Días y Horarios de Servicios</div>
@@ -4448,6 +4501,9 @@ function guardarConfig(){
     cron_domTarde:svcs[3]?svcs[3].label:'Domingo 10:30 AM',
     // Nuevo: lista dinámica completa
     servicios_dinamicos:JSON.stringify(svcs),
+    pastor_principal:g('cfgPastorPrincipal')||'PASTOR NELSON',
+    meta_asistencia_adultos:g('cfgMetaAdultos')||'1950',
+    meta_asistencia_ninos:g('cfgMetaNinos')||'820',
     logo_url:localStorage.getItem(LOGO_KEY)||'',
     gemini_api_key:g('cfgGeminiKey')||'',
     openrouter_api_key:g('cfgOpenrouterKey')||'',

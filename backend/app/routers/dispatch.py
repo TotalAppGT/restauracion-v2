@@ -625,7 +625,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             menuConfig = {}
             for m in ALL_MENU_IDS:
                 menuConfig[m] = configs.get(f"menu_mod_{m}", "SI") != "NO"
-            return {"ok": True, "ssId": configs.get("ssId",""), "nombre": configs.get("nombre","REDIL"), "formUrl": configs.get("formUrl",""), "formUrlPublic": configs.get("formUrlPublic",f"{_get_system_url()}/form"), "activo": True, "logo_url": configs.get("logo_url","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "logoUrl": configs.get("logoUrl","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "menuConfig": menuConfig, "ownerEmail": configs.get("ownerEmail","totalappgt@gmail.com"), "inactividadMinutos": int(configs.get("inactividadMinutos","60")), "metaGrupos": configs.get("metaGrupos","407"), "driveFolderId": configs.get("driveFolderId","1OHBSDIk7e1FOyC1tgkkAJoRb_nJh2CKM"), "botPdfFolderId": configs.get("botPdfFolderId",""), "pdf_id": configs.get("pdf_id",""), "gemini_api_key": configs.get("gemini_api_key",""), "openrouter_api_key": configs.get("openrouter_api_key",""), "deepseek_api_key": configs.get("deepseek_api_key",""), "telegram_token": configs.get("telegram_token", os.getenv("TELEGRAM_TOKEN", "")), "telegram_chat_id": configs.get("telegram_chat_id", os.getenv("TELEGRAM_CHAT_ID", "")),
+            return {"ok": True, "ssId": configs.get("ssId",""), "nombre": configs.get("nombre","REDIL"), "formUrl": configs.get("formUrl",""), "formUrlPublic": configs.get("formUrlPublic",f"{_get_system_url()}/form"), "activo": True, "logo_url": configs.get("logo_url","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "logoUrl": configs.get("logoUrl","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "menuConfig": menuConfig, "ownerEmail": configs.get("ownerEmail","totalappgt@gmail.com"), "inactividadMinutos": int(configs.get("inactividadMinutos","60")), "metaGrupos": configs.get("metaGrupos","407"), "pastor_principal": configs.get("pastor_principal","PASTOR NELSON"), "meta_asistencia_adultos": configs.get("meta_asistencia_adultos","1950"), "meta_asistencia_ninos": configs.get("meta_asistencia_ninos","820"), "driveFolderId": configs.get("driveFolderId","1OHBSDIk7e1FOyC1tgkkAJoRb_nJh2CKM"), "botPdfFolderId": configs.get("botPdfFolderId",""), "pdf_id": configs.get("pdf_id",""), "gemini_api_key": configs.get("gemini_api_key",""), "openrouter_api_key": configs.get("openrouter_api_key",""), "deepseek_api_key": configs.get("deepseek_api_key",""), "telegram_token": configs.get("telegram_token", os.getenv("TELEGRAM_TOKEN", "")), "telegram_chat_id": configs.get("telegram_chat_id", os.getenv("TELEGRAM_CHAT_ID", "")),
             "firebaseApiKey": configs.get("firebaseApiKey", os.getenv("FIREBASE_API_KEY", "")),
             "firebaseAuthDomain": configs.get("firebaseAuthDomain", os.getenv("FIREBASE_AUTH_DOMAIN", "totalappgt-d15b9.firebaseapp.com")),
             "firebaseProjectId": configs.get("firebaseProjectId", os.getenv("FIREBASE_PROJECT_ID", "totalappgt-d15b9")),
@@ -645,6 +645,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             gr.archivo_generado = f"/api/pdf/{no_serie}"
             db.commit()
             return {"ok": True, "msg": "PDF guardado"}
+
+        if action == "saveConfig":
             for key, val in payload.items():
                 if key in ("token", "action"): continue
                 existing = db.query(Configuracion).filter(Configuracion.clave == key).first()
@@ -1565,117 +1567,222 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "generarInformeDetallado":
             desde = payload.get("desde", "").strip()
             hasta = payload.get("hasta", "").strip()
-            distrito = payload.get("distrito", "").strip()
-            zona = payload.get("zona", "").strip()
-            tipo = payload.get("tipo", "Informe Detallado de Grupos").strip()
-            q = db.query(Reporte)
-            if desde:
-                try:
-                    d = datetime.strptime(desde, "%Y-%m-%d").date(); q = q.filter(Reporte.fecha >= d)
-                except: pass
-            if hasta:
-                try:
-                    d = datetime.strptime(hasta, "%Y-%m-%d").date(); q = q.filter(Reporte.fecha <= d)
-                except: pass
-            if distrito: q = q.filter(Reporte.distrito == distrito)
-            if zona: q = q.filter(Reporte.zona == zona)
-            reportes = q.order_by(Reporte.distrito, Reporte.zona, Reporte.codigo, Reporte.fecha).all()
-            if not reportes:
-                return {"ok": False, "msg": "No se encontraron reportes en el periodo seleccionado"}
-            # Seguimientos del periodo
-            qseg = db.query(Seguimiento)
-            if desde:
-                try:
-                    d = datetime.strptime(desde, "%Y-%m-%d").date(); qseg = qseg.filter(Seguimiento.fecha >= d)
-                except: pass
-            if hasta:
-                try:
-                    d = datetime.strptime(hasta, "%Y-%m-%d").date(); qseg = qseg.filter(Seguimiento.fecha <= d)
-                except: pass
-            segs = qseg.order_by(Seguimiento.fecha).all()
-            # Resumen de seguimientos por tipo
-            seg_tipos = {}
-            for s in segs:
-                t = s.tipo or "Otro"
-                seg_tipos[t] = seg_tipos.get(t, 0) + 1
-            # Agrupar por distrito -> zona -> lider
-            distritos = {}
-            total_asist = 0; total_hnos = 0; total_amg = 0; total_ninos = 0; total_of = 0.0; total_rptes = 0
-            for r in reportes:
-                dk = str(r.distrito or "?"); zk = str(r.zona or "?"); ck = r.codigo or "?"
-                if dk not in distritos: distritos[dk] = {"distrito": dk, "zonas": {}, "asistencia": 0, "ofrenda": 0.0, "reportes": 0}
-                if zk not in distritos[dk]["zonas"]: distritos[dk]["zonas"][zk] = {"zona": zk, "lideres": {}, "asistencia": 0, "ofrenda": 0.0, "reportes": 0}
-                if ck not in distritos[dk]["zonas"][zk]["lideres"]:
-                    distritos[dk]["zonas"][zk]["lideres"][ck] = {"codigo": ck, "nombre": r.lider or "", "pastor": r.pastor_zona or "", "supervisor": r.sup_sector or "", "reportes": [], "asistencia": 0, "hnos": 0, "amigos": 0, "ninos": 0, "ofrenda": 0.0}
-                lid = distritos[dk]["zonas"][zk]["lideres"][ck]
-                of = float(r.ofrenda_total or 0)
-                lid["reportes"].append({"fecha": str(r.fecha) if r.fecha else "", "tipo": r.tipo_reporte or "Mixta", "origen": r.reporte_origen or "Fisico", "asistencia": r.asistencia or 0, "hnos": r.hnos or 0, "amigos": r.amigos or 0, "ninos": r.ninos or 0, "ofrenda": round(of, 2), "estado": r.ofrenda_recibida or "Pendiente"})
-                lid["asistencia"] += r.asistencia or 0; lid["hnos"] += r.hnos or 0; lid["amigos"] += r.amigos or 0; lid["ninos"] += r.ninos or 0; lid["ofrenda"] += of
-                distritos[dk]["zonas"][zk]["asistencia"] += r.asistencia or 0
-                distritos[dk]["zonas"][zk]["ofrenda"] += of
-                distritos[dk]["zonas"][zk]["reportes"] += 1
-                distritos[dk]["asistencia"] += r.asistencia or 0
-                distritos[dk]["ofrenda"] += of
-                distritos[dk]["reportes"] += 1
-                total_asist += r.asistencia or 0; total_hnos += r.hnos or 0; total_amg += r.amigos or 0; total_ninos += r.ninos or 0; total_of += of; total_rptes += 1
-            # Construir HTML detallado
-            fecha_gen = datetime.now().strftime('%d/%m/%Y %I:%M %p')
-            sys_nom = ""
+            distrito_f = payload.get("distrito", "").strip()
+            zona_f = payload.get("zona", "").strip()
+            tipo = payload.get("tipo", "REPORTE SEMANAL DE GRUPOS FAMILIARES").strip()
+
+            # Fecha de referencia (desde, o hoy)
             try:
-                c = db.query(Configuracion).filter(Configuracion.clave == "nombre").first()
-                if c: sys_nom = c.valor
-            except: pass
-            body_html = ""
-            for dk in sorted(distritos.keys()):
-                dg = distritos[dk]
-                body_html += f'<div style="margin:14px 0;border:1px solid #d0d8e8;border-radius:10px;overflow:hidden">'
-                body_html += f'<div style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:10px 14px;font-weight:800">{esc("Distrito "+dk)} — {dg["reportes"]} reportes · {dg["asistencia"]} asist. · Q{dg["ofrenda"]:,.2f}</div>'
-                for zk in sorted(dg["zonas"].keys()):
-                    zg = dg["zonas"][zk]
-                    body_html += f'<div style="background:#eef2f8;padding:8px 14px;font-weight:700;color:#1a3a5c">Zona {esc(zk)} — {zg["reportes"]} reportes · Q{zg["ofrenda"]:,.2f}</div>'
-                    body_html += '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#1a3a5c;color:#fff"><th style="padding:6px 8px;text-align:left">Código</th><th style="text-align:left">Líder</th><th style="text-align:center">Reuniones</th><th style="text-align:center">AGF</th><th style="text-align:center">Hnos</th><th style="text-align:center">Amg</th><th style="text-align:center">Niñ</th><th style="text-align:right">Ofrenda</th></tr></thead><tbody>'
-                    for ck in sorted(zg["lideres"].keys()):
-                        lid = zg["lideres"][ck]
-                        body_html += f'<tr style="border-bottom:1px solid #eef0f5"><td style="padding:6px 8px;font-family:monospace;font-weight:700">{esc(lid["codigo"])}</td><td><b>{esc(lid["nombre"])}</b><br><span style="font-size:10px;color:#666">{esc(lid["pastor"])} · {esc(lid["supervisor"])}</span></td><td style="text-align:center">{len(lid["reportes"])}</td><td style="text-align:center"><b>{lid["asistencia"]}</b></td><td style="text-align:center">{lid["hnos"]}</td><td style="text-align:center">{lid["amigos"]}</td><td style="text-align:center">{lid["ninos"]}</td><td style="text-align:right;font-weight:800;color:#c87f00">Q{lid["ofrenda"]:,.2f}</td></tr>'
-                    body_html += '</tbody></table>'
-                body_html += '</div>'
-            # Seccion de seguimientos
-            seg_html = ""
-            if segs:
-                seg_html += '<div style="margin:14px 0;border:1px solid #d0d8e8;border-radius:10px;overflow:hidden">'
-                seg_html += f'<div style="background:linear-gradient(135deg,#7d3c98,#5b2c6f);color:#fff;padding:10px 14px;font-weight:800">Seguimientos ({len(segs)})</div>'
-                seg_html += '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#5b2c6f;color:#fff"><th style="padding:6px 8px;text-align:left">Fecha</th><th style="text-align:left">Persona</th><th style="text-align:left">Tipo</th><th style="text-align:left">Responsable</th><th style="text-align:left">Estado</th></tr></thead><tbody>'
-                for s in segs:
-                    seg_html += f'<tr style="border-bottom:1px solid #eef0f5"><td style="padding:6px 8px;white-space:nowrap">{str(s.fecha)[:10] if s.fecha else ""}</td><td><b>{esc(s.persona or "")}</b></td><td>{esc(s.tipo or "")}</td><td>{esc(s.responsable or "")}</td><td>{esc(s.estado or "")}</td></tr>'
-                seg_html += '</tbody></table></div>'
-            # Resumen de seguimientos por tipo para KPIs
-            seg_resumen = ""
-            if seg_tipos:
-                seg_resumen = " · ".join([f"{esc(k)}: {v}" for k, v in sorted(seg_tipos.items())])
-            html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>{esc(sys_nom or 'Iglesia Restauracion')} — {esc(tipo)}</title>
-            <style>@page{{size:letter;margin:0.4in}}body{{font-family:Arial,sans-serif;background:#f5f6fa;color:#222;padding:0}}
-            .hdr{{background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:16px 20px;border-radius:10px;-webkit-print-color-adjust:exact}}
-            .hdr h1{{margin:0;font-size:20px}}.hdr .sub{{font-size:12px;opacity:.85;margin-top:3px}}
-            .kpis{{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin:12px 0}}
-            .kpi{{background:#fff;border-radius:8px;padding:10px;text-align:center;box-shadow:0 1px 4px rgba(0,0,0,.06);border-left:3px solid #2563a8}}
-            .kpi .v{{font-size:18px;font-weight:900;color:#1a3a5c}}.kpi .l{{font-size:10px;color:#777;text-transform:uppercase}}
+                d_ref = datetime.strptime(desde, "%Y-%m-%d").date() if desde else datetime.now().date()
+            except:
+                d_ref = datetime.now().date()
+
+            # Filtros de fecha
+            q = db.query(Reporte)
+            d_desde = None; d_hasta = None
+            if desde:
+                try:
+                    d_desde = datetime.strptime(desde, "%Y-%m-%d").date(); q = q.filter(Reporte.fecha >= d_desde)
+                except: pass
+            if hasta:
+                try:
+                    d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date(); q = q.filter(Reporte.fecha <= d_hasta)
+                except: pass
+            if distrito_f: q = q.filter(Reporte.distrito == distrito_f)
+            if zona_f: q = q.filter(Reporte.zona == zona_f)
+            reportes = q.all()
+
+            # Configuración
+            cfg = {}
+            for c in db.query(Configuracion).all():
+                cfg[c.clave] = c.valor
+            sys_nom = cfg.get("nombre", "Iglesia Restauracion")
+            pastor_principal = cfg.get("pastor_principal", "PASTOR NELSON")
+            try: meta_adultos = int(float(cfg.get("meta_asistencia_adultos", "1950") or 0))
+            except: meta_adultos = 1950
+            try: meta_ninos = int(float(cfg.get("meta_asistencia_ninos", "820") or 0))
+            except: meta_ninos = 820
+            meta_total = meta_adultos + meta_ninos
+
+            def zkey(d, z): return (str(d or "").strip(), str(z or "").strip())
+            def zblank(): return {"inicio": 0, "nuevo_set": set(), "hechos": set(), "adultos": 0, "ninos": 0, "conv_gru": 0, "rec_gru": 0, "visitas": 0, "pastor_zona": ""}
+
+            zonas = {}
+            lider_nombre_a_zona = {}
+
+            # Lideres (hermanos) -> INICIO (cada lider = un grupo) + pastor de zona + nombres
+            for h in db.query(Hermano).all():
+                if not h.codigo_lead: continue
+                d = str(h.distrito or "").strip(); z = str(h.zona or "").strip()
+                if not d and not z: continue
+                k = zkey(d, z)
+                if k not in zonas: zonas[k] = zblank()
+                zonas[k]["inicio"] += 1
+                if h.pastor_zona: zonas[k]["pastor_zona"] = zonas[k]["pastor_zona"] or str(h.pastor_zona).strip()
+                if h.nombre: lider_nombre_a_zona[str(h.nombre).strip().upper()] = k
+
+            # Pastores de zona -> nombre (tabla pastores)
+            for p in db.query(Pastore).all():
+                k = zkey(p.distrito, p.zona)
+                if k in zonas and p.nombre_pastor:
+                    zonas[k]["pastor_zona"] = str(p.nombre_pastor).strip()
+
+            # Codigos que ya reportaron antes del periodo (para calcular NUEVO)
+            codigos_antes = set()
+            if d_desde:
+                codigos_antes = set(x[0] for x in db.query(Reporte.codigo).filter(Reporte.fecha < d_desde, Reporte.codigo != None).all())
+
+            # Reportes del periodo -> HECHOS, ADULTOS, NIÑOS, NUEVO
+            for r in reportes:
+                k = zkey(r.distrito, r.zona)
+                if k not in zonas: zonas[k] = zblank()
+                zz = zonas[k]
+                if r.pastor_zona: zz["pastor_zona"] = zz["pastor_zona"] or str(r.pastor_zona).strip()
+                if r.codigo:
+                    ck = str(r.codigo)
+                    zz["hechos"].add(ck)
+                    if ck not in codigos_antes: zz["nuevo_set"].add(ck)
+                zz["adultos"] += (r.hnos or 0) + (r.amigos or 0)
+                zz["ninos"] += (r.ninos or 0)
+                if r.lider: lider_nombre_a_zona.setdefault(str(r.lider).strip().upper(), k)
+
+            # Seguimientos del periodo -> FRUTOS (mapeo por responsable)
+            qseg = db.query(Seguimiento)
+            if d_desde: qseg = qseg.filter(Seguimiento.fecha >= d_desde)
+            if d_hasta: qseg = qseg.filter(Seguimiento.fecha <= d_hasta)
+            frutos_global = {"conv": 0, "rec": 0, "vis": 0}
+            for s in qseg.all():
+                t = (s.tipo or "").lower()
+                k = lider_nombre_a_zona.get((s.responsable or "").strip().upper())
+                if k and k in zonas:
+                    if t == "convertido": zonas[k]["conv_gru"] += 1
+                    elif "reconcil" in t: zonas[k]["rec_gru"] += 1
+                    elif "visita" in t: zonas[k]["visitas"] += 1
+                else:
+                    if t == "convertido": frutos_global["conv"] += 1
+                    elif "reconcil" in t: frutos_global["rec"] += 1
+                    elif "visita" in t: frutos_global["vis"] += 1
+
+            # Bautizos del periodo
+            bq = db.query(Bautizo)
+            if d_desde: bq = bq.filter(Bautizo.fecha >= d_desde)
+            if d_hasta: bq = bq.filter(Bautizo.fecha <= d_hasta)
+            total_bautizados = bq.count()
+
+            def zsort(items):
+                return sorted(items, key=lambda k: (int(k[0]) if k[0].isdigit() else 99999, k[0], int(k[1]) if k[1].isdigit() else 99999, k[1]))
+
+            # Construir filas por zona + totales por distrito + total general
+            filas = []
+            dist_tot = {}
+            tg = {"inicio": 0, "nuevo": 0, "cerrado": 0, "cubierto": 0, "total": 0, "hechos": 0, "adultos": 0, "ninos": 0, "conv_gru": 0, "conv_igle": 0, "visitas": 0, "bautizados": 0, "rec_gru": 0, "rec_igle": 0}
+            for (d, z) in zsort(list(zonas.keys())):
+                zz = zonas[(d, z)]
+                inicio = zz["inicio"]
+                nuevo = len(zz["nuevo_set"])
+                hechos = len(zz["hechos"])
+                total = inicio + nuevo
+                fila = {
+                    "zona": z, "distrito": d, "pastor": zz["pastor_zona"],
+                    "inicio": inicio, "nuevo": nuevo, "cerrado": 0, "cubierto": 0, "total": total,
+                    "hechos": hechos, "no_hechos": hechos - total,
+                    "adultos": zz["adultos"], "ninos": zz["ninos"],
+                    "conv_gru": zz["conv_gru"], "conv_igle": 0, "visitas": zz["visitas"],
+                    "bautizados": 0, "rec_gru": zz["rec_gru"], "rec_igle": 0
+                }
+                filas.append(fila)
+                dt = dist_tot.setdefault(d, dict(tg, distrito=d))
+                for f in ("inicio","nuevo","cerrado","cubierto","total","hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"):
+                    dt[f] += fila[f]
+                for f in ("inicio","nuevo","cerrado","cubierto","total","hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"):
+                    tg[f] += fila[f]
+            tg["bautizados"] = total_bautizados
+            tg["conv_gru"] += frutos_global["conv"]
+            tg["rec_gru"] += frutos_global["rec"]
+            tg["visitas"] += frutos_global["vis"]
+
+            # Meta / semana anterior / presente
+            pre_adultos = tg["adultos"]; pre_ninos = tg["ninos"]; pre_total = pre_adultos + pre_ninos
+            ant_adultos = ant_ninos = 0
+            if d_desde:
+                ant_from = d_desde - timedelta(days=7); ant_to = d_desde - timedelta(days=1)
+                for r in db.query(Reporte).filter(Reporte.fecha >= ant_from, Reporte.fecha <= ant_to).all():
+                    ant_adultos += (r.hnos or 0) + (r.amigos or 0)
+                    ant_ninos += (r.ninos or 0)
+            ant_total = ant_adultos + ant_ninos
+            pct = round((pre_total / meta_total * 100) if meta_total else 0, 1)
+
+            # Trimestre y semana
+            trimestre = (d_ref.month - 1) // 3 + 1
+            q_start_month = (trimestre - 1) * 3 + 1
+            q_start = datetime(d_ref.year, q_start_month, 1).date()
+            semana = ((d_ref - q_start).days // 7) + 1
+            MESES_ES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+            fecha_txt = f"{d_ref.day} de {MESES_ES[d_ref.month-1]} de {d_ref.year}"
+            fecha_gen = datetime.now().strftime('%d/%m/%Y %I:%M %p')
+
+            # ── HTML (PDF) con la estructura exacta ──
+            COLS = ["inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"]
+            HDR1 = ["INICIO","NUEVO","CERRADO","CUBIERTO","TOTAL","HECHOS","NO HECHOS","ADULTOS","NIÑOS","CONV. GRU.","CONV. IGLE","VISITAS P.","BAUTIZADOS","REC. GRU.","REC. IGLE."]
+            def cell(v, bold=False, num=True):
+                if v == 0: s = ""
+                elif isinstance(v, float): s = f"{v:,.1f}"
+                else: s = str(v)
+                b = "font-weight:700;" if bold else ""
+                return f'<td style="padding:3px 5px;text-align:center;font-size:10px;border:1px solid #b9c2d0;{b}">{s}</td>'
+            body = []
+            for f in filas:
+                tds = [f'<td style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0">{esc(f["zona"])}</td>',
+                       f'<td style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0">{esc(f["pastor"])}</td>']
+                for i, c in enumerate(COLS):
+                    tds.append(cell(f[c], bold=(c == "total")))
+                body.append('<tr>' + ''.join(tds) + '</tr>')
+            # Filas de distrito
+            for d in sorted(dist_tot.keys(), key=lambda x: (int(x) if x.isdigit() else 99999, x)):
+                dt = dist_tot[d]
+                tds = [f'<td colspan="2" style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0;font-weight:800;background:#e8edf5">DISTRITO {esc(d)}</td>']
+                for c in COLS:
+                    tds.append(cell(dt[c], bold=True))
+                body.append('<tr>' + ''.join(tds) + '</tr>')
+            # Total general
+            tds = [f'<td colspan="2" style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0;font-weight:800;background:#d8e1ee">TOTAL GENERAL</td>']
+            for c in COLS:
+                tds.append(cell(tg[c], bold=True))
+            body.append('<tr>' + ''.join(tds) + '</tr>')
+            body_html = ''.join(body)
+
+            html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>{esc(sys_nom)} — {esc(tipo)}</title>
+            <style>@page{{size:letter landscape;margin:0.35in}}body{{font-family:Arial,sans-serif;color:#111;margin:0}}
+            table{{border-collapse:collapse;width:100%}}
+            .titulo{{font-size:16px;font-weight:900;text-align:center}}
+            .subtitulo{{font-size:13px;font-weight:700;text-align:center}}
+            .meta th{{font-size:9px;font-weight:700;text-align:center}}
+            .meta td{{font-size:10px;text-align:center;border:1px solid #b9c2d0;padding:3px 5px}}
             @media print{{body{{background:#fff}}}}</style></head><body>
-            <div class="hdr"><h1>{esc(sys_nom or 'Iglesia Restauracion')}</h1><div class="sub">{esc(tipo)} · {desde or 'Inicio'} → {hasta or 'Hoy'} · {fecha_gen}</div></div>
-            <div class="kpis"><div class="kpi"><div class="v">{total_rptes}</div><div class="l">Reportes</div></div><div class="kpi"><div class="v">{total_asist}</div><div class="l">Asistencia</div></div><div class="kpi"><div class="v">{total_hnos}</div><div class="l">Hermanos</div></div><div class="kpi"><div class="v">{total_amg}</div><div class="l">Amigos</div></div><div class="kpi"><div class="v">Q{total_of:,.2f}</div><div class="l">Ofrenda</div></div></div>
-            {body_html}
-            {seg_html}
-            <div style="margin-top:14px;font-size:10px;color:#888;text-align:center">{esc(sys_nom or 'Iglesia Restauracion')} · iglesiarestauracion.totalappgt.online</div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div><div class="titulo">{esc(sys_nom)}</div><div class="subtitulo">{esc(tipo)}</div>
+              <div style="font-size:11px;margin-top:4px">FECHA<br><b>{esc(fecha_txt)}</b></div></div>
+              <div style="text-align:right;font-size:11px">TRIMESTRE&nbsp;&nbsp;<b>{trimestre}</b><br>SEMANA&nbsp;&nbsp;<b>{semana}</b></div>
+            </div>
+            <table style="margin-top:10px">
+              <thead>
+              <tr><th colspan="2" style="border:1px solid #b9c2d0;font-size:10px">ZONA</th><th colspan="7" style="border:1px solid #b9c2d0;font-size:10px">INFORME DE GRUPOS</th><th colspan="2" style="border:1px solid #b9c2d0;font-size:10px">ASISTENCIA</th><th colspan="6" style="border:1px solid #b9c2d0;font-size:10px">FRUTOS</th></tr>
+              <tr><th style="border:1px solid #b9c2d0;font-size:9px"></th><th style="border:1px solid #b9c2d0;font-size:9px">PASTOR DE ZONA</th>{''.join(f'<th style="border:1px solid #b9c2d0;font-size:8px">{h}</th>' for h in HDR1)}</tr>
+              </thead>
+              <tbody>{body_html}</tbody>
+            </table>
+            <table class="meta" style="margin-top:16px">
+              <tr><th></th><th>ADULTOS</th><th>NIÑOS</th><th>TOTAL</th><th colspan="3">SEMANA ANTERIOR</th><th colspan="3">SEMANA PRESENTE</th><th>%</th></tr>
+              <tr><td style="text-align:left;font-weight:800">{esc(pastor_principal)}</td><td colspan="3" style="text-align:left;font-weight:800">META ASISTENCIA</td><td>ADULTO</td><td>NIÑOS</td><td>TOTAL</td><td>ADULTOS</td><td>NIÑOS</td><td>TOTAL</td><td></td></tr>
+              <tr><td style="text-align:left"></td><td>{meta_adultos}</td><td>{meta_ninos}</td><td>{meta_total}</td><td>{ant_adultos}</td><td>{ant_ninos}</td><td>{ant_total}</td><td>{pre_adultos}</td><td>{pre_ninos}</td><td>{pre_total}</td><td>{pct}%</td></tr>
+            </table>
+            <div style="margin-top:12px;font-size:9px;color:#888;text-align:center">{esc(sys_nom)} · generado {fecha_gen}</div>
             </body></html>"""
-            # Datos planos para XLSX
-            filas_xlsx = []
-            for dk in sorted(distritos.keys()):
-                dg = distritos[dk]
-                for zk in sorted(dg["zonas"].keys()):
-                    zg = dg["zonas"][zk]
-                    for ck in sorted(zg["lideres"].keys()):
-                        lid = zg["lideres"][ck]
-                        filas_xlsx.append({"Distrito": dk, "Zona": zk, "Codigo": lid["codigo"], "Lider": lid["nombre"], "Pastor Zona": lid["pastor"], "Supervisor": lid["supervisor"], "Reuniones": len(lid["reportes"]), "Asistencia": lid["asistencia"], "Hermanos": lid["hnos"], "Amigos": lid["amigos"], "Ninos": lid["ninos"], "Ofrenda": round(lid["ofrenda"], 2)})
-            return {"ok": True, "html": html, "data": filas_xlsx, "titulo": tipo, "resumen": {"reportes": total_rptes, "asistencia": total_asist, "hermanos": total_hnos, "amigos": total_amg, "ninos": total_ninos, "ofrenda": round(total_of, 2)}}
+
+            return {"ok": True, "html": html, "titulo": tipo, "fecha": fecha_txt, "trimestre": trimestre, "semana": semana,
+                    "pastorPrincipal": pastor_principal,
+                    "meta": {"adultos": meta_adultos, "ninos": meta_ninos, "total": meta_total, "antAdultos": ant_adultos, "antNinos": ant_ninos, "antTotal": ant_total, "preAdultos": pre_adultos, "preNinos": pre_ninos, "preTotal": pre_total, "pct": pct},
+                    "filas": filas, "distritos": list(dist_tot.values()), "total": tg}
 
         # ── WHATSAPP ──
         if action == "sendWhatsapp":
