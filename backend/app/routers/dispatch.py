@@ -154,7 +154,7 @@ def _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_e
     return "\n".join(lineas)
 
 ALL_MENU_IDS = [
-    'dashboard','reportes','reporteDigital','formulario','generador',
+    'dashboard','reportes','reporteDigital','formulario','generador','informedetallado',
     'hermanos','cargaMasiva','seguimientos','privilegios',
     'diezmos','gastos','cuadre','inventario','insumos','bautizos',
     'supervisores','pastores','pastoresdistrito','ayudapastor',
@@ -162,7 +162,7 @@ ALL_MENU_IDS = [
 ]
 
 ROL_DEFAULT_MENU = {
-    'Admin':     ['dashboard','reportes','reporteDigital','formulario','generador','hermanos','cargaMasiva','seguimientos','privilegios','diezmos','gastos','cuadre','inventario','insumos','bautizos','envio','notificaciones','contactos','usuarios','supervisores','pastores','pastoresdistrito','ayudapastor','configuracion','bitacora'],
+    'Admin':     ['dashboard','reportes','reporteDigital','formulario','generador','informedetallado','hermanos','cargaMasiva','seguimientos','privilegios','diezmos','gastos','cuadre','inventario','insumos','bautizos','envio','notificaciones','contactos','usuarios','supervisores','pastores','pastoresdistrito','ayudapastor','configuracion','bitacora'],
     'Líder':     ['dashboard','reportes','reporteDigital','formulario','seguimientos'],
     'Secretario':['dashboard','reportes','reporteDigital','generador','seguimientos','envio','contactos'],
     'Tesorero':  ['dashboard','reportes','diezmos','gastos','generador','envio'],
@@ -208,7 +208,9 @@ def make_user_response(u):
     rol_lower = str(u.rol).lower().strip() if u.rol else ''
     gas_role = DB_TO_GAS_ROLE.get(rol_lower, 'Solo Lectura')
     
-    if u.menu_permitido:
+    if rol_lower == 'propietario':
+        menu = list(ALL_MENU_IDS)
+    elif u.menu_permitido:
         menu = None
         try:
             menu = json.loads(u.menu_permitido) if isinstance(u.menu_permitido, str) else u.menu_permitido
@@ -1580,6 +1582,22 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             reportes = q.order_by(Reporte.distrito, Reporte.zona, Reporte.codigo, Reporte.fecha).all()
             if not reportes:
                 return {"ok": False, "msg": "No se encontraron reportes en el periodo seleccionado"}
+            # Seguimientos del periodo
+            qseg = db.query(Seguimiento)
+            if desde:
+                try:
+                    d = datetime.strptime(desde, "%Y-%m-%d").date(); qseg = qseg.filter(Seguimiento.fecha >= d)
+                except: pass
+            if hasta:
+                try:
+                    d = datetime.strptime(hasta, "%Y-%m-%d").date(); qseg = qseg.filter(Seguimiento.fecha <= d)
+                except: pass
+            segs = qseg.order_by(Seguimiento.fecha).all()
+            # Resumen de seguimientos por tipo
+            seg_tipos = {}
+            for s in segs:
+                t = s.tipo or "Otro"
+                seg_tipos[t] = seg_tipos.get(t, 0) + 1
             # Agrupar por distrito -> zona -> lider
             distritos = {}
             total_asist = 0; total_hnos = 0; total_amg = 0; total_ninos = 0; total_of = 0.0; total_rptes = 0
@@ -1621,6 +1639,19 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         body_html += f'<tr style="border-bottom:1px solid #eef0f5"><td style="padding:6px 8px;font-family:monospace;font-weight:700">{esc(lid["codigo"])}</td><td><b>{esc(lid["nombre"])}</b><br><span style="font-size:10px;color:#666">{esc(lid["pastor"])} · {esc(lid["supervisor"])}</span></td><td style="text-align:center">{len(lid["reportes"])}</td><td style="text-align:center"><b>{lid["asistencia"]}</b></td><td style="text-align:center">{lid["hnos"]}</td><td style="text-align:center">{lid["amigos"]}</td><td style="text-align:center">{lid["ninos"]}</td><td style="text-align:right;font-weight:800;color:#c87f00">Q{lid["ofrenda"]:,.2f}</td></tr>'
                     body_html += '</tbody></table>'
                 body_html += '</div>'
+            # Seccion de seguimientos
+            seg_html = ""
+            if segs:
+                seg_html += '<div style="margin:14px 0;border:1px solid #d0d8e8;border-radius:10px;overflow:hidden">'
+                seg_html += f'<div style="background:linear-gradient(135deg,#7d3c98,#5b2c6f);color:#fff;padding:10px 14px;font-weight:800">Seguimientos ({len(segs)})</div>'
+                seg_html += '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr style="background:#5b2c6f;color:#fff"><th style="padding:6px 8px;text-align:left">Fecha</th><th style="text-align:left">Persona</th><th style="text-align:left">Tipo</th><th style="text-align:left">Responsable</th><th style="text-align:left">Estado</th></tr></thead><tbody>'
+                for s in segs:
+                    seg_html += f'<tr style="border-bottom:1px solid #eef0f5"><td style="padding:6px 8px;white-space:nowrap">{str(s.fecha)[:10] if s.fecha else ""}</td><td><b>{esc(s.persona or "")}</b></td><td>{esc(s.tipo or "")}</td><td>{esc(s.responsable or "")}</td><td>{esc(s.estado or "")}</td></tr>'
+                seg_html += '</tbody></table></div>'
+            # Resumen de seguimientos por tipo para KPIs
+            seg_resumen = ""
+            if seg_tipos:
+                seg_resumen = " · ".join([f"{esc(k)}: {v}" for k, v in sorted(seg_tipos.items())])
             html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>{esc(sys_nom or 'Iglesia Restauracion')} — {esc(tipo)}</title>
             <style>@page{{size:letter;margin:0.4in}}body{{font-family:Arial,sans-serif;background:#f5f6fa;color:#222;padding:0}}
             .hdr{{background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:16px 20px;border-radius:10px;-webkit-print-color-adjust:exact}}
@@ -1632,6 +1663,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             <div class="hdr"><h1>{esc(sys_nom or 'Iglesia Restauracion')}</h1><div class="sub">{esc(tipo)} · {desde or 'Inicio'} → {hasta or 'Hoy'} · {fecha_gen}</div></div>
             <div class="kpis"><div class="kpi"><div class="v">{total_rptes}</div><div class="l">Reportes</div></div><div class="kpi"><div class="v">{total_asist}</div><div class="l">Asistencia</div></div><div class="kpi"><div class="v">{total_hnos}</div><div class="l">Hermanos</div></div><div class="kpi"><div class="v">{total_amg}</div><div class="l">Amigos</div></div><div class="kpi"><div class="v">Q{total_of:,.2f}</div><div class="l">Ofrenda</div></div></div>
             {body_html}
+            {seg_html}
             <div style="margin-top:14px;font-size:10px;color:#888;text-align:center">{esc(sys_nom or 'Iglesia Restauracion')} · iglesiarestauracion.totalappgt.online</div>
             </body></html>"""
             # Datos planos para XLSX
