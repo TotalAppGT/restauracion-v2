@@ -1809,17 +1809,18 @@ function renderInformeDetallado(el){
     <div style="padding:14px;display:flex;flex-direction:column;gap:10px">
       <div class="fgg"><label>Periodo</label>
         <select class="fc" id="idPeriodo" onchange="setInformePeriodo()">
+          <option value="semana_pasada" selected>Semana Pasada</option>
           <option value="semana">Esta Semana</option>
-          <option value="mes" selected>Este Mes</option>
+          <option value="mes">Este Mes</option>
           <option value="trimestre">Este Trimestre</option>
           <option value="personalizado">Personalizado</option>
         </select>
       </div>
-      <div id="idRangoCustom" style="display:none;display:flex;gap:10px">
+      <div style="display:flex;gap:10px">
         <div class="fgg" style="flex:1"><label>Desde</label><input class="fc" type="date" id="idDesde"></div>
         <div class="fgg" style="flex:1"><label>Hasta</label><input class="fc" type="date" id="idHasta"></div>
       </div>
-      <div class="fgg"><label>Titulo del Informe</label><input class="fc" id="idTitulo" value="Informe Detallado de Grupos"></div>
+      <div class="fgg"><label>Titulo del Informe</label><input class="fc" id="idTitulo" value="REPORTE SEMANAL DE GRUPOS FAMILIARES"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <div class="fgg" style="flex:1;min-width:140px"><label>Distrito</label><select class="fc" id="idDist"><option value="">Todos</option>${dists.map(function(d){return '<option value="'+d+'">D'+d+'</option>';}).join('')}</select></div>
         <div class="fgg" style="flex:1;min-width:140px"><label>Zona</label><select class="fc" id="idZona"><option value="">Todas</option>${zonas.map(function(z){return '<option value="'+z+'">Z'+z+'</option>';}).join('')}</select></div>
@@ -1837,23 +1838,38 @@ function renderInformeDetallado(el){
   </div>`;
   setInformePeriodo();
 }
+function _fechaLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _semanaPasada(){
+  var hoy=new Date();
+  var dia=hoy.getDay();
+  var dif=dia===0?6:dia-1;
+  var esteLunes=new Date(hoy); esteLunes.setDate(hoy.getDate()-dif);
+  var pasadoLunes=new Date(esteLunes); pasadoLunes.setDate(esteLunes.getDate()-7);
+  var pasadoDomingo=new Date(pasadoLunes); pasadoDomingo.setDate(pasadoLunes.getDate()+6);
+  return [_fechaLocal(pasadoLunes),_fechaLocal(pasadoDomingo)];
+}
 function setInformePeriodo(){
-  var p=document.getElementById('idPeriodo')?.value||'mes';
-  var custom=document.getElementById('idRangoCustom');
-  if(custom)custom.style.display=(p==='personalizado')?'flex':'none';
-  if(p!=='personalizado'){return;}
+  var p=document.getElementById('idPeriodo')?.value||'semana_pasada';
+  var desdeEl=document.getElementById('idDesde');
+  var hastaEl=document.getElementById('idHasta');
+  if(!desdeEl||!hastaEl)return;
+  if(p==='personalizado')return;
+  var hoy=new Date();
+  var desde='',hasta='';
+  if(p==='semana_pasada'){var r=_semanaPasada();desde=r[0];hasta=r[1];}
+  else if(p==='semana'){var dia=hoy.getDay();var dif=dia===0?6:dia-1;var l=new Date(hoy);l.setDate(hoy.getDate()-dif);desde=_fechaLocal(l);var d2=new Date(l);d2.setDate(l.getDate()+6);hasta=_fechaLocal(d2);}
+  else if(p==='mes'){desde=_fechaLocal(new Date(hoy.getFullYear(),hoy.getMonth(),1));hasta=_fechaLocal(new Date(hoy.getFullYear(),hoy.getMonth()+1,0));}
+  else if(p==='trimestre'){var qIni=Math.floor(hoy.getMonth()/3)*3;desde=_fechaLocal(new Date(hoy.getFullYear(),qIni,1));hasta=_fechaLocal(new Date(hoy.getFullYear(),qIni+3,0));}
+  desdeEl.value=desde;hastaEl.value=hasta;
 }
 var _informeHTML='';var _informeData=[];var _informeDatos=null;
 function generarInformeDetallado(){
-  var p=document.getElementById('idPeriodo')?.value||'mes';
   var desde=document.getElementById('idDesde')?.value||'';
   var hasta=document.getElementById('idHasta')?.value||'';
   var distrito=document.getElementById('idDist')?.value||'';
   var zona=document.getElementById('idZona')?.value||'';
   var titulo=document.getElementById('idTitulo')?.value||'REPORTE SEMANAL DE GRUPOS FAMILIARES';
-  if(p==='semana'){var h=new Date();var d=h.getDay();var dif=d===0?-6:1-d;var l=new Date(h);l.setDate(h.getDate()+dif);desde=l.toISOString().split('T')[0];var dom=new Date(l);dom.setDate(l.getDate()+6);hasta=dom.toISOString().split('T')[0];}
-  else if(p==='mes'){var h2=new Date();desde=new Date(h2.getFullYear(),h2.getMonth(),1).toISOString().split('T')[0];hasta=new Date(h2.getFullYear(),h2.getMonth()+1,0).toISOString().split('T')[0];}
-  else if(p==='trimestre'){var h3=new Date();var qIni=Math.floor(h3.getMonth()/3)*3;desde=new Date(h3.getFullYear(),qIni,1).toISOString().split('T')[0];hasta=new Date(h3.getFullYear(),qIni+3,0).toISOString().split('T')[0];}
+  if(!desde||!hasta){toast('Selecciona Desde y Hasta','wa');return;}
   loading(true);
   call('generarInformeDetallado',{desde:desde,hasta:hasta,distrito:distrito,zona:zona,tipo:titulo},function(_,res){
     loading(false);

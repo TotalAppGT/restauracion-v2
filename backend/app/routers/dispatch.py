@@ -1673,9 +1673,10 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 return sorted(items, key=lambda k: (int(k[0]) if k[0].isdigit() else 99999, k[0], int(k[1]) if k[1].isdigit() else 99999, k[1]))
 
             # Construir filas por zona + totales por distrito + total general
+            FIELDS = ("inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle")
             filas = []
             dist_tot = {}
-            tg = {"inicio": 0, "nuevo": 0, "cerrado": 0, "cubierto": 0, "total": 0, "hechos": 0, "adultos": 0, "ninos": 0, "conv_gru": 0, "conv_igle": 0, "visitas": 0, "bautizados": 0, "rec_gru": 0, "rec_igle": 0}
+            tg = {f: 0 for f in FIELDS}
             for (d, z) in zsort(list(zonas.keys())):
                 zz = zonas[(d, z)]
                 inicio = zz["inicio"]
@@ -1692,9 +1693,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 }
                 filas.append(fila)
                 dt = dist_tot.setdefault(d, dict(tg, distrito=d))
-                for f in ("inicio","nuevo","cerrado","cubierto","total","hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"):
+                for f in FIELDS:
                     dt[f] += fila[f]
-                for f in ("inicio","nuevo","cerrado","cubierto","total","hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"):
+                for f in FIELDS:
                     tg[f] += fila[f]
             tg["bautizados"] = total_bautizados
             tg["conv_gru"] += frutos_global["conv"]
