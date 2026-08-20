@@ -288,6 +288,11 @@ ROL_DEFAULT_MENU = {
     'Solo Lectura': ['dashboard','reportes','envio','contactos']
 }
 
+# Módulos añadidos al sistema después de que los usuarios existentes ya tenían su menú guardado.
+# Se auto-agregan al menú de los usuarios que lo tengan en el menú base de su rol, para que
+# los módulos nuevos aparezcan sin tener que re-editar cada usuario.
+AUTO_MODULOS_NUEVOS = ['informedetallado']
+
 DB_TO_GAS_ROLE = {
     'propietario': 'Admin', 'admin': 'Admin', 'lider': 'Líder',
     'secretario': 'Secretario', 'tesorero': 'Tesorero', 'digitador': 'Digitador'
@@ -339,6 +344,11 @@ def make_user_response(u):
                 pass
         if not isinstance(menu, list) or not menu:
             menu = list(ROL_DEFAULT_MENU.get(gas_role, ROL_DEFAULT_MENU['Solo Lectura']))
+        # Módulos nuevos del menú base del rol se auto-agregan para usuarios existentes
+        rol_default = ROL_DEFAULT_MENU.get(gas_role, ROL_DEFAULT_MENU['Solo Lectura'])
+        for m in AUTO_MODULOS_NUEVOS:
+            if m in rol_default and m not in menu:
+                menu.append(m)
         if 'dashboard' not in menu:
             menu.insert(0, 'dashboard')
     else:

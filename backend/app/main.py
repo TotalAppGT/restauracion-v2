@@ -164,6 +164,40 @@ try:
 except Exception as e:
     print(f"⚠️ Seed admin: {e}")
 
+# Migración: agregar módulos nuevos al menú guardado de usuarios existentes
+# (para que módulos como "Informe Detallado" aparezcan marcados y visibles sin re-editar usuarios)
+try:
+    import json as _json
+    from app.routers.dispatch import AUTO_MODULOS_NUEVOS, ROL_DEFAULT_MENU, DB_TO_GAS_ROLE
+    db = SessionLocal()
+    cambios = 0
+    for u in db.query(Usuario).all():
+        if not u.menu_permitido or u.rol == "propietario":
+            continue
+        try:
+            menu = _json.loads(u.menu_permitido) if isinstance(u.menu_permitido, str) else u.menu_permitido
+        except Exception:
+            menu = None
+        if not isinstance(menu, list):
+            continue
+        rol_lower = str(u.rol or "").lower().strip()
+        gas_role = DB_TO_GAS_ROLE.get(rol_lower, "Solo Lectura")
+        rol_default = ROL_DEFAULT_MENU.get(gas_role, ROL_DEFAULT_MENU["Solo Lectura"])
+        modificado = False
+        for m in AUTO_MODULOS_NUEVOS:
+            if m in rol_default and m not in menu:
+                menu.append(m)
+                modificado = True
+        if modificado:
+            u.menu_permitido = _json.dumps(menu)
+            cambios += 1
+    if cambios:
+        db.commit()
+        print(f"✅ Módulos nuevos agregados a {cambios} usuario(s) existente(s)")
+    db.close()
+except Exception as e:
+    print(f"⚠️ Migración módulos nuevos: {e}")
+
 app = FastAPI(title="REDIL API", version="7.0")
 
 app.add_middleware(
