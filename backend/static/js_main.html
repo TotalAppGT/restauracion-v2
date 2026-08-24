@@ -1758,6 +1758,8 @@ let _genData=null;
 function renderGenerador(el){
   const supSects=[...new Set(APP.hermanos.map(h=>h['Sup SectorL']).filter(Boolean))].sort();
   const supAreas=[...new Set(APP.hermanos.map(h=>h['Sup AreaL']).filter(Boolean))].sort();
+  const ayudas=[...new Set(APP.hermanos.map(h=>h['Ayuda Pastor']||h['Sup AreaL']).filter(Boolean))].sort();
+  const pzones=[...new Set(APP.hermanos.map(h=>h['Pastor Zona']).filter(Boolean))].sort();
   var dists=[...new Set(APP.hermanos.map(function(h){return h['Distrito']}).filter(Boolean))].sort();
   var zonas=[...new Set(APP.hermanos.map(function(h){return h['Zona']}).filter(Boolean))].sort();
   el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-file-invoice"></i> Generador de Reportes e Informe Exprés</h2></div>
@@ -1768,13 +1770,25 @@ function renderGenerador(el){
         <div style="display:flex;flex-direction:column;gap:10px">
           <div class="fgg"><label>Desde <span class="req">*</span></label><input class="fc" type="date" id="gD" value="${fom30()}"></div>
           <div class="fgg"><label>Hasta <span class="req">*</span></label><input class="fc" type="date" id="gH" value="${today()}"></div>
+          <div class="fgg"><label>Agrupar por</label><select class="fc" id="gAgr" onchange="toggleGrupoFiltros()">
+            <option value="distrito">Distrito</option>
+            <option value="zona">Zona</option>
+            <option value="pastorZona">Pastor de Zona</option>
+            <option value="supSector">Sup. de Sector</option>
+            <option value="supArea">Sup. de Área</option>
+            <option value="ayudaPastor">Ayuda de Pastor</option>
+            <option value="lider">Líder</option>
+          </select></div>
           <div class="fgg"><label>Filtrar por Líder</label><select class="fc" id="gL"><option value="">Todos los líderes</option>${[...new Set(APP.hermanos.map(h=>h['NombreL']).filter(Boolean))].sort().map(n=>`<option>${n}</option>`).join('')}</select></div>
           <div class="fgg"><label>Filtrar por Distrito</label><select class="fc" id="gDist"><option value="">Todos los distritos</option>${dists.map(function(d){return '<option value="'+d+'">D'+d+'</option>';}).join('')}</select></div>
           <div class="fgg"><label>Filtrar por Zona</label><select class="fc" id="gZona"><option value="">Todas las zonas</option>${zonas.map(function(z){return '<option value="'+z+'">Z'+z+'</option>';}).join('')}</select></div>
+          <div class="fgg"><label>Filtrar por Pastor de Zona</label><select class="fc" id="gPZ"><option value="">Todos</option>${pzones.map(s=>`<option>${s}</option>`).join('')}</select></div>
           <div class="fgg"><label>Filtrar por Sup. Sector</label><select class="fc" id="gSS"><option value="">Todos los sectores</option>${supSects.map(s=>`<option>${s}</option>`).join('')}</select></div>
-          <div class="fgg"><label>Filtrar por Ayuda de Pastor</label><select class="fc" id="gSA"><option value="">Todas las áreas</option>${supAreas.map(s=>`<option>${s}</option>`).join('')}</select></div>
-          <div class="fgg"><label>Título del Reporte</label><input class="fc" id="gTit" value="Reporte Mensual"></div>
-          <button class="btn btn-pr" onclick="genReporte()"><i class="fas fa-cogs"></i> Generar Reporte General</button>
+          <div class="fgg"><label>Filtrar por Sup. Área</label><select class="fc" id="gSA"><option value="">Todas las áreas</option>${supAreas.map(s=>`<option>${s}</option>`).join('')}</select></div>
+          <div class="fgg" id="grpFiltroAyuda" style="display:none"><label>Filtrar por Ayuda de Pastor</label><select class="fc" id="gAyuda"><option value="">Todas</option>${ayudas.map(s=>`<option>${s}</option>`).join('')}</select></div>
+          <div class="fgg"><label>Título del Reporte</label><input class="fc" id="gTit" value="Reporte Detallado de Grupos"></div>
+          <button class="btn btn-pr" onclick="genReporteAgrupado()"><i class="fas fa-cogs"></i> Generar Reporte Detallado</button>
+          <button class="btn btn-sec" onclick="genReporte()" style="margin-top:4px"><i class="fas fa-list-alt"></i> Generar Reporte General (lista)</button>
           <button class="btn btn-ac" onclick="cargarCuadreExpresDistrital()" style="margin-top:4px; background:#7d3c98; color:white;"><i class="fas fa-calculator"></i> Ver Reporte Exprés de Cuadre</button>
         </div>
       </div>
@@ -1792,11 +1806,17 @@ function renderGenerador(el){
         <span><i class="fas fa-eye"></i> Panel de Previsualización y Control Contable</span>
       </div>
       <div id="genPreview" style="min-height:320px; padding:10px;">
-        <div style="text-align:center; color:var(--tx3); padding-top:60px;"><i class="fas fa-file-invoice" style="font-size:44px;margin-bottom:12px;display:block;opacity:.3"></i><p style="font-weight:700">Configure los filtros o presione "Ver Reporte Exprés de Cuadre"</p></div>
+        <div style="text-align:center; color:var(--tx3); padding-top:60px;"><i class="fas fa-file-invoice" style="font-size:44px;margin-bottom:12px;display:block;opacity:.3"></i><p style="font-weight:700">Configure los filtros y agrupación, luego presione "Generar Reporte Detallado"</p></div>
       </div>
     </div>
   </div>`;
   loadRepo();
+  toggleGrupoFiltros();
+}
+function toggleGrupoFiltros(){
+  const agr=document.getElementById('gAgr')?.value||'distrito';
+  const ay=document.getElementById('grpFiltroAyuda');
+  if(ay){ay.style.display=(agr==='ayudaPastor')?'':'none';}
 }
 
 // ── INFORME DETALLADO ────────────────────────────────────────
@@ -2255,6 +2275,69 @@ function imprimirGen(){
     _lastGenHtml=res.html;_lastGenSerie=res.noSerie;
     abrirVentanaImpresion(res.html);
   });
+}
+
+// ── REPORTE AGRUPADO / DETALLADO DINÁMICO ──
+var _grupoHtml='';var _grupoXlsx='';var _grupoAgrupar='distrito';
+function genReporteAgrupado(){
+  var desde=document.getElementById('gD')?.value||'';
+  var hasta=document.getElementById('gH')?.value||'';
+  var agrupar=document.getElementById('gAgr')?.value||'distrito';
+  if(!desde||!hasta){toast('Selecciona Desde y Hasta','wa');return;}
+  var data={desde:desde,hasta:hasta,agrupar:agrupar,tipo:document.getElementById('gTit')?.value||'Reporte Detallado de Grupos'};
+  var lider=document.getElementById('gL')?.value||'';if(lider)data.lider=lider;
+  var dist=document.getElementById('gDist')?.value||'';if(dist)data.distrito=dist;
+  var zona=document.getElementById('gZona')?.value||'';if(zona)data.zona=zona;
+  var pz=document.getElementById('gPZ')?.value||'';if(pz)data.pastorZona=pz;
+  var ss=document.getElementById('gSS')?.value||'';if(ss)data.supSector=ss;
+  var sa=document.getElementById('gSA')?.value||'';if(sa)data.supArea=sa;
+  var ay=document.getElementById('gAyuda')?.value||'';if(ay)data.ayudaPastor=ay;
+  loading(true);
+  call('generarReporteAgrupado',data,function(_,res){
+    loading(false);
+    if(!res||!res.ok){toast((res&&res.msg)||'Error generando reporte','er');return;}
+    _grupoHtml=res.html||'';_grupoXlsx=res.xlsx_base64||'';_grupoAgrupar=res.agrupar_label||agrupar;
+    var prev=document.getElementById('genPreview');if(!prev)return;
+    var ifr=document.createElement('iframe');
+    ifr.style='width:100%;height:480px;border:none;border-radius:8px';
+    prev.innerHTML='';prev.appendChild(ifr);
+    ifr.contentDocument.open();ifr.contentDocument.write(res.html);ifr.contentDocument.close();
+    var bar=document.createElement('div');
+    bar.style='display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;padding:10px;background:var(--bg3);border-radius:8px';
+    bar.innerHTML='<span style="color:var(--pr);font-weight:700;font-size:13px"><i class="fas fa-layer-group"></i> '+esc(_grupoAgrupar)+' — '+(res.total.grupos||0)+' grupos</span>'
+      +'<button class="btn btn-pr btn-sm" onclick="generarGrupoPDF()"><i class="fas fa-file-pdf"></i> PDF</button>'
+      +'<button class="btn btn-ok btn-sm" onclick="descargarGrupoXLSX()"><i class="fas fa-file-excel"></i> Excel</button>'
+      +'<button class="btn btn-er btn-sm" onclick="imprimirGrupo()"><i class="fas fa-print"></i> Imprimir</button>';
+    prev.appendChild(bar);
+    toast('Reporte generado por '+_grupoAgrupar,'ok');
+  });
+}
+function descargarGrupoXLSX(){
+  if(!_grupoXlsx){toast('Genera el reporte primero','wa');return;}
+  try{
+    var bin=atob(_grupoXlsx);
+    var bytes=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    var blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='Reporte_Detallado_'+_grupoAgrupar.replace(/[^A-Za-z0-9]/g,'_')+'.xlsx';
+    document.body.appendChild(a);a.click();a.remove();
+    setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+  }catch(e){toast('Error: '+e.message,'er');}
+}
+function imprimirGrupo(){
+  if(!_grupoHtml){toast('Genera el reporte primero','wa');return;}
+  abrirVentanaImpresion(_grupoHtml);
+}
+function generarGrupoPDF(){
+  if(!_grupoHtml){toast('Genera el reporte primero','wa');return;}
+  loading(true);
+  try{
+    html2pdf().set({margin:[5,5,5,5],filename:'Reporte_Detallado_'+_grupoAgrupar.replace(/[^A-Za-z0-9]/g,'_')+'.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,letterRendering:true},jsPDF:{unit:'mm',format:'letter',orientation:'landscape'}}).from(_grupoHtml).save().then(function(){
+      loading(false);toast('PDF generado','ok');
+    }).catch(function(e){loading(false);toast('Error: '+e.message,'er');});
+  }catch(e){loading(false);toast('Error: '+e.message,'er');}
 }
 
 // === HERMANOS LIDERES v6 ===

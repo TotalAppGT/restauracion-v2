@@ -13,6 +13,7 @@ import bcrypt
 import os
 import json
 import base64
+import re
 import requests
 from datetime import datetime, timedelta
 from dateutil import parser as dateparser
@@ -32,6 +33,10 @@ def pdf_safe(s):
 def _htmlesc(s):
     """Escape HTML entities. Separada de esc() para evitar conflicto con variable local en dispatch()."""
     return str(s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+
+def _zkey(d, z):
+    """Clave normalizada (distrito, zona) para agrupar."""
+    return (str(d or "").strip(), str(z or "").strip())
 
 def _informe_xlsx_base64(filas, distritos, total, meta, sys_nom, tipo, fecha_txt, trimestre, semana, pastor_principal):
     """Genera el XLSX del informe semanal con bordes y estilos (openpyxl) y lo devuelve en base64."""
@@ -146,6 +151,88 @@ def _informe_xlsx_base64(filas, distritos, total, meta, sys_nom, tipo, fecha_txt
     ws.column_dimensions["B"].width = 24
     for col in range(3, 18):
         ws.column_dimensions[get_column_letter(col)].width = 10
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return base64.b64encode(buf.getvalue()).decode("ascii")
+
+def _grupo_xlsx_base64(grupos, total, sys_nom, tipo, fecha_txt, agrupar_label, filas_detalle=None):
+    """Genera XLSX de reporte agrupado con bordes: resumen por grupo + detalle."""
+    import io
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
+    from openpyxl.utils import get_column_letter
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Resumen"
+    thin = Side(style="thin", color="000000")
+    border = Border(left=thin, right=thin, top=thin, bottom=thin)
+    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    left_al = Alignment(horizontal="left", vertical="center", wrap_text=True)
+    header_fill = PatternFill("solid", fgColor="1A3A5C")
+    sub_fill = PatternFill("solid", fgColor="E8EDF5")
+    total_fill = PatternFill("solid", fgColor="FCE4D6")
+    white_font = Font(bold=True, color="FFFFFF")
+
+    RES_COLS = ["grupos","asistencia","hnos","amigos","ninos","ofrenda","recibidas","pendientes"]
+    RES_HDRS = ["GRUPOS","ASIST.","HNOS","AMIGOS","NIÑOS","OFRENDA","RECIBIDAS","PEND."]
+
+    def setv(r, c, v, bold=False, fill=None, align=None, font=None, bd=True):
+        cell = ws.cell(row=r, column=c, value=v)
+        cell.font = font or Font(bold=bold)
+        cell.alignment = align or (center if isinstance(v, (int, float)) else left_al)
+        if bd: cell.border = border
+        if fill: cell.fill = fill
+        return cell
+
+    ws.merge_cells("A1:I1"); setv(1, 1, (sys_nom or "IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL").upper(), bold=True, align=center, bd=False)
+    ws.merge_cells("A2:I2"); setv(2, 1, tipo, bold=True, align=center, bd=False)
+    ws.merge_cells("A3:I3"); setv(3, 1, fecha_txt, align=center, bd=False)
+
+    setv(4, 1, agrupar_label, bold=True, align=center, fill=header_fill, font=white_font)
+    for i, h in enumerate(RES_HDRS):
+        setv(4, 2 + i, h, bold=True, align=center, fill=header_fill, font=white_font)
+
+    r = 5
+    for g in grupos:
+        setv(r, 1, g["label"], align=left_al)
+        for i, c in enumerate(RES_COLS):
+            v = g[c]
+            if v == 0: v = None
+            setv(r, 2 + i, v, align=center, bold=(c == "ofrenda"))
+        r += 1
+
+    setv(r, 1, "TOTAL GENERAL", bold=True, align=left_al, fill=total_fill)
+    for i, c in enumerate(RES_COLS):
+        v = total[c]
+        if v == 0: v = None
+        setv(r, 2 + i, v, bold=True, align=center, fill=total_fill)
+
+    ws.column_dimensions["A"].width = 32
+    for col in range(2, 10):
+        ws.column_dimensions[get_column_letter(col)].width = 11
+
+    if filas_detalle:
+        ws2 = wb.create_sheet("Detalle")
+        DET_HDRS = ["GRUPO","CÓDIGO","LÍDER","FECHA","DIST","ZONA","AGF","HNOS","AMIGOS","NIÑOS","OFRENDA","ESTADO"]
+        for i, h in enumerate(DET_HDRS):
+            c2 = ws2.cell(row=1, column=1 + i, value=h)
+            c2.font = white_font; c2.alignment = center; c2.border = border; c2.fill = header_fill
+        r2 = 2
+        for fd in filas_detalle:
+            vals = [fd.get("grupo",""), fd.get("codigo",""), fd.get("lider",""), str(fd.get("fecha") or ""),
+                    fd.get("distrito",""), fd.get("zona",""), fd.get("asistencia") or 0,
+                    fd.get("hnos") or 0, fd.get("amigos") or 0, fd.get("ninos") or 0,
+                    fd.get("ofrenda") or 0, fd.get("estado","")]
+            for ci, v in enumerate(vals):
+                c2 = ws2.cell(row=r2, column=1 + ci, value=v)
+                c2.border = border
+                c2.alignment = center if ci >= 6 else left_al
+            r2 += 1
+        widths = [26, 10, 26, 11, 8, 8, 9, 9, 9, 9, 12, 12]
+        for i, w in enumerate(widths):
+            ws2.column_dimensions[get_column_letter(1 + i)].width = w
 
     buf = io.BytesIO()
     wb.save(buf)
@@ -1933,6 +2020,238 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     "pastorPrincipal": pastor_principal, "xlsx_base64": xlsx_base64,
                     "meta": {"adultos": meta_adultos, "ninos": meta_ninos, "total": meta_total, "antAdultos": ant_adultos, "antNinos": ant_ninos, "antTotal": ant_total, "preAdultos": pre_adultos, "preNinos": pre_ninos, "preTotal": pre_total, "pct": pct},
                     "filas": filas, "distritos": dist_list, "total": tg}
+
+        # ── REPORTE AGRUPADO / DETALLADO (dinámico por dimensión) ──
+        if action == "generarReporteAgrupado":
+            desde = payload.get("desde", "").strip()
+            hasta = payload.get("hasta", "").strip()
+            agrupar = payload.get("agrupar", "distrito").strip()
+            filtro_distrito = payload.get("distrito", "").strip()
+            filtro_zona = payload.get("zona", "").strip()
+            filtro_lider = payload.get("lider", "").strip()
+            filtro_sup_sector = payload.get("supSector", "").strip()
+            filtro_sup_area = payload.get("supArea", "").strip()
+            filtro_pastor_zona = payload.get("pastorZona", "").strip()
+            filtro_ayuda = payload.get("ayudaPastor", "").strip()
+            tipo = payload.get("tipo", "REPORTE DETALLADO DE GRUPOS").strip() or "REPORTE DETALLADO DE GRUPOS"
+
+            # Fecha de referencia
+            try:
+                d_ref = datetime.strptime(desde, "%Y-%m-%d").date() if desde else datetime.now().date()
+            except:
+                d_ref = datetime.now().date()
+
+            # Mapa de nombres de dimensión
+            label_map = {
+                "distrito": "DISTRITO", "zona": "ZONA", "pastorZona": "PASTOR DE ZONA",
+                "lider": "LÍDER", "supSector": "SUP. DE SECTOR", "supArea": "SUP. DE ÁREA",
+                "ayudaPastor": "AYUDA DE PASTOR"
+            }
+            agrupar_label = label_map.get(agrupar, "GRUPO")
+
+            # Cache de pastores de zona y de distrito
+            pastores_zona = {}
+            for p in db.query(Pastore).all():
+                k = _zkey(p.distrito, p.zona)
+                if p.nombre_pastor:
+                    pastores_zona.setdefault(k, str(p.nombre_pastor).strip())
+            pastores_distrito = {}
+            for pd_ in db.query(PastorDistrito).all():
+                if pd_.nombre_pastor_distrito:
+                    pastores_distrito[str(pd_.distrito or "").strip()] = str(pd_.nombre_pastor_distrito).strip()
+            supervisores = {}
+            for s in db.query(Supervisor).all():
+                if s.nombre_sup:
+                    supervisores[str(s.nombre_sup).strip().upper()] = str(s.nombre_sup).strip()
+            ayudas_pastor = {}
+            for ap_ in db.query(AyudaPastor).all():
+                if ap_.nombre_ayuda:
+                    ayudas_pastor[str(ap_.nombre_ayuda).strip().upper()] = str(ap_.nombre_ayuda).strip()
+
+            # Hermanos -> mapa por codigo_lead para resolver lider/sup/ayuda
+            hermanos_by_cod = {}
+            for h in db.query(Hermano).all():
+                if h.codigo_lead:
+                    hermanos_by_cod[str(h.codigo_lead).strip()] = h
+
+            def _resolve_hermano(r):
+                return hermanos_by_cod.get(str(r.codigo or "").strip())
+
+            def _group_label(r):
+                h = _resolve_hermano(r)
+                if agrupar == "distrito":
+                    d = r.distrito or (h.distrito if h else "") or "?"
+                    pd_nom = pastores_distrito.get(str(d).strip(), "")
+                    return f"D{d} · {pd_nom}" if pd_nom else f"D{d}"
+                if agrupar == "zona":
+                    d = r.distrito or (h.distrito if h else "") or "?"
+                    z = r.zona or (h.zona if h else "") or "?"
+                    return f"D{d} Z{z}"
+                if agrupar == "pastorZona":
+                    pz = (r.pastor_zona or (h.pastor_zona if h else "") or "").strip()
+                    if not pz:
+                        pz = pastores_zona.get(_zkey(r.distrito or (h.distrito if h else None), r.zona or (h.zona if h else None)), "")
+                    return pz or "SIN PASTOR DE ZONA"
+                if agrupar == "lider":
+                    return (r.lider or "").strip() or "SIN LÍDER"
+                if agrupar == "supSector":
+                    return (r.sup_sector or (h.sup_sector if h else "") or "").strip() or "SIN SUP. SECTOR"
+                if agrupar == "supArea":
+                    return (r.sup_area or (h.sup_area if h else "") or "").strip() or "SIN SUP. ÁREA"
+                if agrupar == "ayudaPastor":
+                    ap_ = (h.ayuda_pastor or "").strip() if h else ""
+                    return ap_ or "SIN AYUDA PASTOR"
+                return "GENERAL"
+
+            # Filtros de fecha y dimensiones
+            q = db.query(Reporte)
+            d_desde = None; d_hasta = None
+            if desde:
+                try:
+                    d_desde = datetime.strptime(desde, "%Y-%m-%d").date()
+                    q = q.filter(Reporte.fecha >= d_desde)
+                except: pass
+            if hasta:
+                try:
+                    d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date()
+                    q = q.filter(Reporte.fecha <= d_hasta)
+                except: pass
+            if filtro_distrito: q = q.filter(Reporte.distrito == filtro_distrito)
+            if filtro_zona: q = q.filter(Reporte.zona == filtro_zona)
+            if filtro_lider: q = q.filter(Reporte.lider.ilike(f"%{filtro_lider}%"))
+            if filtro_sup_sector: q = q.filter(Reporte.sup_sector.ilike(f"%{filtro_sup_sector}%"))
+            if filtro_sup_area: q = q.filter(Reporte.sup_area.ilike(f"%{filtro_sup_area}%"))
+            if filtro_pastor_zona: q = q.filter(Reporte.pastor_zona.ilike(f"%{filtro_pastor_zona}%"))
+            reportes = q.order_by(Reporte.distrito, Reporte.zona, Reporte.fecha).all()
+
+            # Post-filtro por ayuda de pastor (no es columna de reporte)
+            if filtro_ayuda:
+                reportes = [r for r in reportes if filtro_ayuda.upper() in _group_label(r).upper()]
+
+            if not reportes:
+                return {"ok": False, "msg": "No hay reportes para los filtros seleccionados en ese periodo"}
+
+            # Acumular por grupo
+            grupos = {}
+            detalle = []
+            for r in reportes:
+                lbl = _group_label(r)
+                g = grupos.setdefault(lbl, {"label": lbl, "grupos": 0, "asistencia": 0, "hnos": 0, "amigos": 0, "ninos": 0, "ofrenda": 0.0, "recibidas": 0, "pendientes": 0})
+                pend = r.ofrenda_recibida in ("Pendiente", "")
+                g["grupos"] += 1
+                g["asistencia"] += r.asistencia or 0
+                g["hnos"] += r.hnos or 0
+                g["amigos"] += r.amigos or 0
+                g["ninos"] += r.ninos or 0
+                g["ofrenda"] += float(r.ofrenda_total or 0)
+                if pend: g["pendientes"] += 1
+                else: g["recibidas"] += 1
+                detalle.append({
+                    "grupo": lbl, "codigo": r.codigo or "", "lider": r.lider or "",
+                    "fecha": str(r.fecha) if r.fecha else "", "distrito": r.distrito or "",
+                    "zona": r.zona or "", "asistencia": r.asistencia or 0,
+                    "hnos": r.hnos or 0, "amigos": r.amigos or 0, "ninos": r.ninos or 0,
+                    "ofrenda": float(r.ofrenda_total or 0),
+                    "estado": "Pendiente" if pend else "Recibida",
+                    "pastor_zona": r.pastor_zona or "", "sup_sector": r.sup_sector or ""
+                })
+
+            def _sort_key(lbl):
+                m = re.search(r"D(\d+)", lbl)
+                m2 = re.search(r"Z(\d+)", lbl)
+                if m:
+                    return (0, int(m.group(1)), int(m2.group(1)) if m2 else 0)
+                return (1, 0, 0)
+
+            grupos_ord = sorted(grupos.values(), key=lambda g: _sort_key(g["label"]))
+            total = {"grupos": 0, "asistencia": 0, "hnos": 0, "amigos": 0, "ninos": 0, "ofrenda": 0.0, "recibidas": 0, "pendientes": 0}
+            for g in grupos_ord:
+                for k in total:
+                    total[k] += g[k]
+            pct_rec = round(total["recibidas"] / total["grupos"] * 100, 1) if total["grupos"] else 0
+
+            sys_nom = _get_church_name(db)
+            fecha_txt = f"Del {d_desde or '—'} al {d_hasta or '—'}" if d_desde else "Periodo seleccionado"
+            fecha_gen = datetime.now().strftime('%d/%m/%Y %I:%M %p')
+
+            # HTML resumen
+            rows_res = ""
+            for g in grupos_ord:
+                pctg = round(g["recibidas"] / g["grupos"] * 100, 1) if g["grupos"] else 0
+                rows_res += f"""<tr>
+                    <td style="text-align:left;font-weight:800">{esc(g['label'])}</td>
+                    <td>{g['grupos']}</td><td>{g['asistencia']}</td><td>{g['hnos']}</td><td>{g['amigos']}</td><td>{g['ninos']}</td>
+                    <td>Q{g['ofrenda']:,.2f}</td><td>{g['recibidas']}</td><td>{g['pendientes']}</td><td>{pctg}%</td></tr>"""
+            # HTML detalle
+            rows_det = ""
+            for d in detalle:
+                rows_det += f"""<tr>
+                    <td style="text-align:left">{esc(d['grupo'])}</td><td><span class="cod">{esc(d['codigo'])}</span></td>
+                    <td style="text-align:left"><b>{esc(d['lider'])}</b></td><td>{esc(d['fecha'])}</td>
+                    <td>{esc(d['distrito'])}</td><td>{esc(d['zona'])}</td>
+                    <td>{d['asistencia']}</td><td>{d['hnos']}</td><td>{d['amigos']}</td><td>{d['ninos']}</td>
+                    <td>Q{d['ofrenda']:,.2f}</td>
+                    <td><span class="{'pend' if d['estado']=='Pendiente' else 'ok'}">{d['estado']}</span></td></tr>"""
+
+            html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
+            <style>
+            *{{margin:0;padding:0;box-sizing:border-box}}
+            @page{{size:letter landscape;margin:0.35in}}
+            body{{font-family:'Inter',Arial,sans-serif;color:#1e293b;background:#fff;font-size:9px}}
+            .hdr{{background:linear-gradient(135deg,#1a3a5c,#2d6a9f);color:#fff;padding:14px 18px;display:flex;justify-content:space-between;align-items:flex-start;-webkit-print-color-adjust:exact}}
+            .hdr h1{{font-size:16px;font-weight:900;margin-bottom:2px}}
+            .hdr .sub{{font-size:8.5px;opacity:.85}}
+            .badge{{background:rgba(255,255,255,.2);padding:5px 12px;border-radius:20px;font-size:10px;font-weight:800}}
+            .kpis{{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;padding:10px 16px;background:#f8f9fe;border-bottom:1px solid #eef0f8}}
+            .kpi{{background:#fff;border-radius:8px;padding:8px 10px;border-left:2.5px solid #1a3a5c;box-shadow:0 1px 3px rgba(0,0,0,.05)}}
+            .kpi .v{{font-size:14px;font-weight:900;color:#1a3a5c}}
+            .kpi .l{{font-size:7.5px;color:#7f8c9b;font-weight:600;text-transform:uppercase}}
+            table{{width:100%;border-collapse:collapse;font-size:8px;margin-top:8px}}
+            th{{background:#1a3a5c;color:#fff;font-size:7.5px;font-weight:700;padding:5px;text-align:center;-webkit-print-color-adjust:exact}}
+            td{{padding:4px 5px;border:1px solid #d6dce8;text-align:center}}
+            tr:nth-child(even) td{{background:#f6f8fc}}
+            .cod{{font-family:monospace;background:#eef0f8;padding:1px 5px;border-radius:4px;color:#2d6a9f;font-weight:700}}
+            .pend{{color:#dc2626;font-weight:700;background:#fef2f2;padding:2px 6px;border-radius:10px}}
+            .ok{{color:#059669;font-weight:700;background:#ecfdf5;padding:2px 6px;border-radius:10px}}
+            .tot td{{font-weight:900;background:#dbe7f3;font-size:9px}}
+            h3.sec{{font-size:11px;font-weight:800;color:#1a3a5c;margin-top:16px}}
+            @media print{{body{{background:#fff}}}}
+            </style></head><body>
+            <div class="hdr">
+              <div><h1>{esc(sys_nom)}</h1><div class="sub">{esc(tipo)} — {esc(fecha_txt)} — {fecha_gen}</div></div>
+              <div class="badge">{total['grupos']} grupos · {len(grupos_ord)} {esc(agrupar_label)}s</div>
+            </div>
+            <div class="kpis">
+              <div class="kpi"><div class="v">{total['grupos']}</div><div class="l">Grupos</div></div>
+              <div class="kpi"><div class="v">{total['asistencia']}</div><div class="l">Asistencia</div></div>
+              <div class="kpi"><div class="v">Q{total['ofrenda']:,.2f}</div><div class="l">Ofrenda</div></div>
+              <div class="kpi"><div class="v">{total['hnos']}</div><div class="l">Hermanos</div></div>
+              <div class="kpi"><div class="v">{total['amigos']}</div><div class="l">Amigos</div></div>
+              <div class="kpi"><div class="v">{pct_rec}%</div><div class="l">Recibidas</div></div>
+            </div>
+            <h3 class="sec">RESUMEN POR {esc(agrupar_label)}</h3>
+            <table>
+              <thead><tr><th style="text-align:left">GRUPO</th><th>GRUPOS</th><th>ASIST.</th><th>HNOS</th><th>AMIGOS</th><th>NIÑOS</th><th>OFRENDA</th><th>RECIB.</th><th>PEND.</th><th>%</th></tr></thead>
+              <tbody>{rows_res}
+              <tr class="tot"><td style="text-align:left">TOTAL GENERAL</td><td>{total['grupos']}</td><td>{total['asistencia']}</td><td>{total['hnos']}</td><td>{total['amigos']}</td><td>{total['ninos']}</td><td>Q{total['ofrenda']:,.2f}</td><td>{total['recibidas']}</td><td>{total['pendientes']}</td><td>{pct_rec}%</td></tr>
+              </tbody>
+            </table>
+            <h3 class="sec">DETALLE POR REPORTE ({len(detalle)})</h3>
+            <table>
+              <thead><tr><th style="text-align:left">{esc(agrupar_label)}</th><th>CÓDIGO</th><th style="text-align:left">LÍDER</th><th>FECHA</th><th>D</th><th>Z</th><th>AGF</th><th>HNOS</th><th>AMG</th><th>NIÑOS</th><th>OFRENDA</th><th>ESTADO</th></tr></thead>
+              <tbody>{rows_det}</tbody>
+            </table>
+            </body></html>"""
+
+            xlsx_base64 = ""
+            try:
+                xlsx_base64 = _grupo_xlsx_base64(grupos_ord, total, sys_nom, tipo, fecha_txt, agrupar_label, detalle)
+            except Exception as e:
+                print(f"XLSX agrupado fallo: {e}")
+
+            return {"ok": True, "html": html, "xlsx_base64": xlsx_base64, "agrupar": agrupar,
+                    "agrupar_label": agrupar_label, "grupos": grupos_ord, "total": total,
+                    "detalle": detalle, "fecha_txt": fecha_txt}
 
         # ── WHATSAPP ──
         if action == "sendWhatsapp":
