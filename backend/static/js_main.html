@@ -1823,6 +1823,11 @@ function toggleGrupoFiltros(){
 function renderInformeDetallado(el){
   var dists=[...new Set(APP.hermanos.map(function(h){return h['Distrito']}).filter(Boolean))].sort();
   var zonas=[...new Set(APP.hermanos.map(function(h){return h['Zona']}).filter(Boolean))].sort();
+  var pzones=[...new Set(APP.hermanos.map(function(h){return h['Pastor Zona']}).filter(Boolean))].sort();
+  var supSects=[...new Set(APP.hermanos.map(function(h){return h['Sup SectorL']}).filter(Boolean))].sort();
+  var supAreas=[...new Set(APP.hermanos.map(function(h){return h['Sup AreaL']}).filter(Boolean))].sort();
+  var ayudas=[...new Set(APP.hermanos.map(function(h){return h['Ayuda Pastor']||h['Sup AreaL']}).filter(Boolean))].sort();
+  var lideres=[...new Set(APP.hermanos.map(function(h){return h['NombreL']}).filter(Boolean))].sort();
   el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-layer-group"></i> Informe Detallado de Grupos</h2></div>
   <div class="card" style="margin-bottom:14px">
     <div class="ct"><i class="fas fa-sliders-h"></i> Configuración del Informe</div>
@@ -1840,15 +1845,37 @@ function renderInformeDetallado(el){
         <div class="fgg" style="flex:1"><label>Desde</label><input class="fc" type="date" id="idDesde"></div>
         <div class="fgg" style="flex:1"><label>Hasta</label><input class="fc" type="date" id="idHasta"></div>
       </div>
+      <div class="fgg"><label>Agrupar por</label>
+        <select class="fc" id="idAgrupar" onchange="toggleInformeAgrupar()">
+          <option value="semanal">Semanal (Distrito / Zona)</option>
+          <option value="distrito">Distrito</option>
+          <option value="zona">Zona</option>
+          <option value="pastorZona">Pastor de Zona</option>
+          <option value="supSector">Sup. de Sector</option>
+          <option value="supArea">Sup. de Área</option>
+          <option value="ayudaPastor">Ayuda de Pastor</option>
+          <option value="lider">Líder</option>
+        </select>
+      </div>
       <div class="fgg"><label>Titulo del Informe</label><input class="fc" id="idTitulo" value="REPORTE SEMANAL DE GRUPOS FAMILIARES"></div>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
         <div class="fgg" style="flex:1;min-width:140px"><label>Distrito</label><select class="fc" id="idDist"><option value="">Todos</option>${dists.map(function(d){return '<option value="'+d+'">D'+d+'</option>';}).join('')}</select></div>
         <div class="fgg" style="flex:1;min-width:140px"><label>Zona</label><select class="fc" id="idZona"><option value="">Todas</option>${zonas.map(function(z){return '<option value="'+z+'">Z'+z+'</option>';}).join('')}</select></div>
       </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="fgg" style="flex:1;min-width:140px"><label>Líder</label><select class="fc" id="idLider"><option value="">Todos</option>${lideres.map(n=>`<option>${n}</option>`).join('')}</select></div>
+        <div class="fgg" style="flex:1;min-width:140px"><label>Pastor de Zona</label><select class="fc" id="idPastorZona"><option value="">Todos</option>${pzones.map(n=>`<option>${n}</option>`).join('')}</select></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <div class="fgg" style="flex:1;min-width:140px"><label>Sup. Sector</label><select class="fc" id="idSupSector"><option value="">Todos</option>${supSects.map(n=>`<option>${n}</option>`).join('')}</select></div>
+        <div class="fgg" style="flex:1;min-width:140px"><label>Sup. Área</label><select class="fc" id="idSupArea"><option value="">Todas</option>${supAreas.map(n=>`<option>${n}</option>`).join('')}</select></div>
+        <div class="fgg" style="flex:1;min-width:140px" id="idAyudaWrap"><label>Ayuda de Pastor</label><select class="fc" id="idAyuda"><option value="">Todas</option>${ayudas.map(n=>`<option>${n}</option>`).join('')}</select></div>
+      </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <button class="btn btn-pr" onclick="generarInformeDetallado()"><i class="fas fa-chart-bar"></i> Generar Informe</button>
         <button class="btn btn-in btn-sm" onclick="descargarInformeXLSX()"><i class="fas fa-file-excel"></i> Descargar XLSX</button>
-        <button class="btn btn-er btn-sm" onclick="imprimirInformeDetallado()"><i class="fas fa-print"></i> Imprimir / PDF</button>
+        <button class="btn btn-er btn-sm" onclick="generarInformePDF()"><i class="fas fa-file-pdf"></i> Descargar PDF</button>
+        <button class="btn btn-ol btn-sm" onclick="imprimirInformeDetallado()"><i class="fas fa-print"></i> Imprimir</button>
       </div>
     </div>
   </div>
@@ -1857,6 +1884,14 @@ function renderInformeDetallado(el){
     <div id="idPreview" style="min-height:300px;padding:10px"><div style="text-align:center;color:var(--tx3);padding-top:60px"><i class="fas fa-layer-group" style="font-size:44px;opacity:.3;display:block;margin-bottom:12px"></i><p style="font-weight:700">Configura el periodo y filtros, luego presiona "Generar Informe"</p></div></div>
   </div>`;
   setInformePeriodo();
+  toggleInformeAgrupar();
+}
+function toggleInformeAgrupar(){
+  var agr=document.getElementById('idAgrupar')?.value||'semanal';
+  var ay=document.getElementById('idAyudaWrap');
+  if(ay){ay.style.display=(agr==='ayudaPastor')?'':'none';}
+  var tit=document.getElementById('idTitulo');
+  if(tit&&agr!=='semanal'&&(tit.value==='REPORTE SEMANAL DE GRUPOS FAMILIARES')){tit.value='REPORTE DETALLADO POR '+(agr==='pastorZona'?'PASTOR DE ZONA':agr==='supSector'?'SUP. DE SECTOR':agr==='supArea'?'SUP. DE ÁREA':agr==='ayudaPastor'?'AYUDA DE PASTOR':agr==='lider'?'LÍDER':agr.toUpperCase());}
 }
 function _fechaLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function _semanaPasada(){
@@ -1889,20 +1924,38 @@ function generarInformeDetallado(){
   var distrito=document.getElementById('idDist')?.value||'';
   var zona=document.getElementById('idZona')?.value||'';
   var titulo=document.getElementById('idTitulo')?.value||'REPORTE SEMANAL DE GRUPOS FAMILIARES';
+  var agrupar=document.getElementById('idAgrupar')?.value||'semanal';
   if(!desde||!hasta){toast('Selecciona Desde y Hasta','wa');return;}
+  var data={desde:desde,hasta:hasta,distrito:distrito,zona:zona,tipo:titulo};
+  var lider=document.getElementById('idLider')?.value||'';if(lider)data.lider=lider;
+  var pz=document.getElementById('idPastorZona')?.value||'';if(pz)data.pastorZona=pz;
+  var ss=document.getElementById('idSupSector')?.value||'';if(ss)data.supSector=ss;
+  var sa=document.getElementById('idSupArea')?.value||'';if(sa)data.supArea=sa;
+  var ay=document.getElementById('idAyuda')?.value||'';if(ay)data.ayudaPastor=ay;
   loading(true);
-  call('generarInformeDetallado',{desde:desde,hasta:hasta,distrito:distrito,zona:zona,tipo:titulo},function(_,res){
+  var action=(agrupar==='semanal')?'generarInformeDetallado':'generarReporteAgrupado';
+  if(agrupar!=='semanal')data.agrupar=agrupar;
+  call(action,data,function(_,res){
     loading(false);
     if(!res||!res.ok){toast(res&&res.msg||'Error generando informe','er');return;}
-    _informeHTML=res.html||'';_informeData=res.data||[];_informeDatos=res;
+    _informeHTML=res.html||'';_informeData=res.data||res.filas||[];_informeDatos=res;
     var prev=document.getElementById('idPreview');
     if(prev){var ifr=document.createElement('iframe');ifr.style='width:100%;height:600px;border:none;border-radius:8px';prev.innerHTML='';prev.appendChild(ifr);ifr.contentDocument.open();ifr.contentDocument.write(res.html);ifr.contentDocument.close();}
-    toast('Informe generado: '+((res.filas||[]).length)+' zonas','ok');
+    toast('Informe generado','ok');
   });
 }
 function imprimirInformeDetallado(){
   if(!_informeHTML){toast('Genera el informe primero','wa');return;}
   abrirVentanaImpresion(_informeHTML);
+}
+function generarInformePDF(){
+  if(!_informeHTML){toast('Genera el informe primero','wa');return;}
+  loading(true);
+  try{
+    html2pdf().set({margin:[5,5,5,5],filename:'Informe_Detallado_Grupos.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,letterRendering:true},jsPDF:{unit:'mm',format:'letter',orientation:'landscape'}}).from(_informeHTML).save().then(function(){
+      loading(false);toast('PDF generado','ok');
+    }).catch(function(e){loading(false);toast('Error: '+e.message,'er');});
+  }catch(e){loading(false);toast('Error: '+e.message,'er');}
 }
 function descargarInformeXLSX(){
   if(!_informeDatos){toast('Genera el informe primero','wa');return;}
@@ -1914,7 +1967,8 @@ function descargarInformeXLSX(){
     var blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
     var a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
-    a.download='Informe_Semanal_Grupos_Familiares.xlsx';
+    var lbl=(_informeDatos.agrupar_label||'Informe_Detallado').replace(/[^A-Za-z0-9]/g,'_');
+    a.download='Informe_'+lbl+'.xlsx';
     document.body.appendChild(a);a.click();a.remove();
     setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
   } else {

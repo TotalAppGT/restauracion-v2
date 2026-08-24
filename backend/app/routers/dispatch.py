@@ -215,22 +215,23 @@ def _grupo_xlsx_base64(grupos, total, sys_nom, tipo, fecha_txt, agrupar_label, f
 
     if filas_detalle:
         ws2 = wb.create_sheet("Detalle")
-        DET_HDRS = ["GRUPO","CÓDIGO","LÍDER","FECHA","DIST","ZONA","AGF","HNOS","AMIGOS","NIÑOS","OFRENDA","ESTADO"]
+        DET_HDRS = ["GRUPO","CÓDIGO","LÍDER","FECHA","DIST","ZONA","PASTOR ZONA","SUP SECTOR","AGF","HNOS","AMIGOS","NIÑOS","OFRENDA","ESTADO"]
         for i, h in enumerate(DET_HDRS):
             c2 = ws2.cell(row=1, column=1 + i, value=h)
             c2.font = white_font; c2.alignment = center; c2.border = border; c2.fill = header_fill
         r2 = 2
         for fd in filas_detalle:
             vals = [fd.get("grupo",""), fd.get("codigo",""), fd.get("lider",""), str(fd.get("fecha") or ""),
-                    fd.get("distrito",""), fd.get("zona",""), fd.get("asistencia") or 0,
+                    fd.get("distrito",""), fd.get("zona",""), fd.get("pastor_zona",""), fd.get("sup_sector",""),
+                    fd.get("asistencia") or 0,
                     fd.get("hnos") or 0, fd.get("amigos") or 0, fd.get("ninos") or 0,
                     fd.get("ofrenda") or 0, fd.get("estado","")]
             for ci, v in enumerate(vals):
                 c2 = ws2.cell(row=r2, column=1 + ci, value=v)
                 c2.border = border
-                c2.alignment = center if ci >= 6 else left_al
+                c2.alignment = center if ci >= 8 else left_al
             r2 += 1
-        widths = [26, 10, 26, 11, 8, 8, 9, 9, 9, 9, 12, 12]
+        widths = [26, 10, 26, 11, 8, 8, 22, 22, 9, 9, 9, 9, 12, 12]
         for i, w in enumerate(widths):
             ws2.column_dimensions[get_column_letter(1 + i)].width = w
 
@@ -2189,6 +2190,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     <td style="text-align:left">{esc(d['grupo'])}</td><td><span class="cod">{esc(d['codigo'])}</span></td>
                     <td style="text-align:left"><b>{esc(d['lider'])}</b></td><td>{esc(d['fecha'])}</td>
                     <td>{esc(d['distrito'])}</td><td>{esc(d['zona'])}</td>
+                    <td style="text-align:left">{esc(d['pastor_zona'])}</td><td style="text-align:left">{esc(d['sup_sector'])}</td>
                     <td>{d['asistencia']}</td><td>{d['hnos']}</td><td>{d['amigos']}</td><td>{d['ninos']}</td>
                     <td>Q{d['ofrenda']:,.2f}</td>
                     <td><span class="{'pend' if d['estado']=='Pendiente' else 'ok'}">{d['estado']}</span></td></tr>"""
@@ -2238,7 +2240,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             </table>
             <h3 class="sec">DETALLE POR REPORTE ({len(detalle)})</h3>
             <table>
-              <thead><tr><th style="text-align:left">{esc(agrupar_label)}</th><th>CÓDIGO</th><th style="text-align:left">LÍDER</th><th>FECHA</th><th>D</th><th>Z</th><th>AGF</th><th>HNOS</th><th>AMG</th><th>NIÑOS</th><th>OFRENDA</th><th>ESTADO</th></tr></thead>
+              <thead><tr><th style="text-align:left">{esc(agrupar_label)}</th><th>CÓDIGO</th><th style="text-align:left">LÍDER</th><th>FECHA</th><th>D</th><th>Z</th><th style="text-align:left">PASTOR ZONA</th><th style="text-align:left">SUP SECTOR</th><th>AGF</th><th>HNOS</th><th>AMG</th><th>NIÑOS</th><th>OFRENDA</th><th>ESTADO</th></tr></thead>
               <tbody>{rows_det}</tbody>
             </table>
             </body></html>"""
