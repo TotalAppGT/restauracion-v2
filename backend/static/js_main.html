@@ -63,7 +63,31 @@ function todayStr(){return today();}
 function fom(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';}
 function fom30(){var d=new Date();d.setDate(d.getDate()-30);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function mesNombre(s){if(!s)return'';var m=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];try{return m[new Date(s+'T12:00:00').getMonth()];}catch(e){return s;}}
-function exportXLS(data,name,file){loading(true);call('exportExcel',{data:data,nombreHoja:name,nombreArchivo:file},function(_,res){loading(false);if(res&&res.ok){var url=res.xlsxUrl||res.url;window.open(url,'_blank');}else toast((res&&res.msg)||'Error al exportar','er');});}
+function exportXLS(data,name,file){
+  loading(true);
+  call('exportExcel',{data:data,nombreHoja:name,nombreArchivo:file},function(_,res){
+    loading(false);
+    if(res&&res.ok){
+      if(res.xlsx_base64){
+        try{
+          var bin=atob(res.xlsx_base64);
+          var bytes=new Uint8Array(bin.length);
+          for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+          var blob=new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+          var a=document.createElement('a');
+          a.href=URL.createObjectURL(blob);
+          a.download=(res.nombreArchivo||file||name||'export')+'.xlsx';
+          document.body.appendChild(a);a.click();a.remove();
+          setTimeout(function(){URL.revokeObjectURL(a.href);},1000);
+        }catch(e){toast('Error al descargar: '+e.message,'er');}
+      } else {
+        var url=res.xlsxUrl||res.url;
+        if(url)window.open(url,'_blank');
+        else toast('Exportado','ok');
+      }
+    } else toast((res&&res.msg)||'Error al exportar','er');
+  });
+}
 function imprimirHermanos(){
   var q=(_hermQ||'').toLowerCase(),dist=(document.getElementById('hFD')||{}).value||'',zona=(document.getElementById('hFZ')||{}).value||'';
   var fil=_herm.filter(function(h){if(dist&&h['Distrito']!==dist)return false;if(zona&&h['Zona']!==zona)return false;if(q&&!JSON.stringify(h).toLowerCase().includes(q))return false;return true;});

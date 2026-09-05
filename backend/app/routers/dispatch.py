@@ -472,26 +472,48 @@ def save_entity(db, model_class, field_map, payload, id_key="ID"):
     # Convertir activo a booleano si existe
     if "activo" in data:
         data["activo"] = str(data["activo"]).upper() in ("SI", "TRUE", "1", "YES")
-    if item_id:
-        obj = db.query(model_class).filter(model_class.id == item_id).first()
-        if not obj:
-            return {"ok": False, "msg": "Registro no encontrado"}
-        for key, val in data.items():
-            setattr(obj, key, val)
-    else:
-        # Auto-resolver codigo unico duplicado (homonimos): agregar sufijo -2, -3...
-        for code_field in ("codigo_ayuda", "codigo_sup", "codigo_pastor", "codigo_lead"):
-            if code_field in data and data[code_field]:
-                base = str(data[code_field])
-                exists = db.query(model_class).filter(getattr(model_class, code_field) == base).first()
-                if exists:
-                    n = 2
-                    while db.query(model_class).filter(getattr(model_class, code_field) == f"{base}-{n}").first():
-                        n += 1
-                    data[code_field] = f"{base}-{n}"
-        obj = model_class(**data)
-        db.add(obj)
-    db.commit()
+    try:
+        if item_id:
+            obj = db.query(model_class).filter(model_class.id == item_id).first()
+            if not obj:
+                return {"ok": False, "msg": "Registro no encontrado"}
+            # Auto-resolver codigo unico duplicado tambien al editar
+            # (si el codigo ya pertenece a OTRO registro, agregar sufijo -2, -3...)
+            for code_field in ("codigo_ayuda", "codigo_sup", "codigo_pastor", "codigo_lead"):
+                if code_field in data and data[code_field]:
+                    base = str(data[code_field])
+                    duplicado = db.query(model_class).filter(
+                        getattr(model_class, code_field) == base,
+                        model_class.id != int(item_id)
+                    ).first()
+                    if duplicado:
+                        n = 2
+                        while db.query(model_class).filter(getattr(model_class, code_field) == f"{base}-{n}", model_class.id != int(item_id)).first():
+                            n += 1
+                        data[code_field] = f"{base}-{n}"
+            for key, val in data.items():
+                setattr(obj, key, val)
+        else:
+            # Auto-resolver codigo unico duplicado (homonimos): agregar sufijo -2, -3...
+            for code_field in ("codigo_ayuda", "codigo_sup", "codigo_pastor", "codigo_lead"):
+                if code_field in data and data[code_field]:
+                    base = str(data[code_field])
+                    exists = db.query(model_class).filter(getattr(model_class, code_field) == base).first()
+                    if exists:
+                        n = 2
+                        while db.query(model_class).filter(getattr(model_class, code_field) == f"{base}-{n}").first():
+                            n += 1
+                        data[code_field] = f"{base}-{n}"
+            obj = model_class(**data)
+            db.add(obj)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        msg = str(e)
+        low = msg.lower()
+        if any(k in low for k in ("codigo_lead", "uniqueviolation", "unique constraint", "duplicate key")):
+            return {"ok": False, "msg": "Ese código ya existe para otro registro. Si estás editando, revisa que Distrito/Zona/Área/Sector/Grupo no coincidan con otro líder."}
+        return {"ok": False, "msg": "Error al guardar: " + msg[:300]}
     return {"ok": True}
 
 def delete_entity(db, model_class, payload, id_key="ID"):
@@ -1536,7 +1558,69 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return {"ok": True, "msg": "Enviado", "enviados": len(emails_list)}
 
         if action == "exportExcel":
-            return {"ok": False, "msg": "Exportación Excel disponible próximamente"}
+            import io as _io
+            from openpyxl import Workbook
+            from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+            from openpyxl.utils import get_column_letter as _gcl
+            try:
+                data = payload.get("data") or []
+                nombre_hoja = (payload.get("nombreHoja") or "Datos")[:31]
+                nombre_archivo = (payload.get("nombreArchivo") or "datos") or "datos"
+                if not isinstance(data, list) or not data:
+                    return {"ok": False, "msg": "No hay datos para exportar"}
+                # Normalizar filas a dicts
+                filas = []
+                for fila in data:
+                    if isinstance(fila, dict):
+                        filas.append(fila)
+                    else:
+                        filas.append({str(i): v for i, v in enumerate(fila)})
+                # Union de columnas preservando orden de aparicion
+                cols = []
+                for fila in filas:
+                    for k in fila.keys():
+                        if k not in cols:
+                            cols.append(k)
+                wb = Workbook()
+                ws = wb.active
+                ws.title = nombre_hoja or "Datos"
+                thin = Side(style="thin", color="B9C2D0")
+                border = Border(left=thin, right=thin, top=thin, bottom=thin)
+                hdr_fill = PatternFill("solid", fgColor="1A3A5C")
+                hdr_font = Font(bold=True, color="FFFFFF")
+                for ci, k in enumerate(cols):
+                    c = ws.cell(row=1, column=ci + 1, value=str(k))
+                    c.font = hdr_font
+                    c.fill = hdr_fill
+                    c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                    c.border = border
+                for ri, fila in enumerate(filas):
+                    for ci, k in enumerate(cols):
+                        v = fila.get(k)
+                        if isinstance(v, (dict, list)):
+                            import json as _json
+                            v = _json.dumps(v, ensure_ascii=False)
+                        if isinstance(v, bool):
+                            v = "SI" if v else "NO"
+                        c = ws.cell(row=ri + 2, column=ci + 1, value=v)
+                        c.border = border
+                        c.alignment = Alignment(vertical="top", wrap_text=True)
+                ws.freeze_panes = "A2"
+                ws.auto_filter.ref = f"A1:{_gcl(len(cols))}1"
+                for ci in range(len(cols)):
+                    anchos = []
+                    for fila in filas:
+                        val = fila.get(cols[ci])
+                        if val is not None:
+                            anchos.append(min(len(str(val)), 60))
+                    maxlen = max(anchos) if anchos else 10
+                    ws.column_dimensions[_gcl(ci + 1)].width = max(maxlen + 2, 10)
+                buf = _io.BytesIO()
+                wb.save(buf)
+                xlsx_b64 = base64.b64encode(buf.getvalue()).decode("ascii")
+                return {"ok": True, "xlsx_base64": xlsx_b64, "nombreArchivo": nombre_archivo}
+            except Exception as e:
+                return {"ok": False, "msg": "Error al exportar Excel: " + str(e)}
 
         if action == "getAreaSupervisores":
             sup_map = {}
