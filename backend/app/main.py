@@ -12,7 +12,7 @@ Base.metadata.create_all(bind=engine)
 
 import os
 def _get_system_url():
-    return os.getenv("SISTEMA_URL", "https://redilrestauracion.totalappgt.online").rstrip("/")
+    return os.getenv("SISTEMA_URL", "https://redilrestauracion.totalappgt.com").rstrip("/")
 
 # Migración: agregar columnas nuevas si no existen
 try:

@@ -2,7 +2,7 @@ import httpx
 import os
 
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-RESEND_FROM = os.getenv("RESEND_FROM", "REDIL Restauración <no-reply@totalappgt.online>")
+RESEND_FROM = os.getenv("RESEND_FROM", "REDIL Restauración <no-reply@totalappgt.com>")
 RESEND_API_URL = "https://api.resend.com/emails"
 
 def send_email(to_emails, subject, html_body, attachments=None, smtp_user=None, smtp_password=None):

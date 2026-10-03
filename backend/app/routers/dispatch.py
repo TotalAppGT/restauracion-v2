@@ -261,7 +261,7 @@ def _get_system_url(db=None):
             c = db.query(Configuracion).filter(Configuracion.clave == "system_url").first()
             if c and c.valor: return c.valor.rstrip("/")
     except: pass
-    return "https://redilrestauracion.totalappgt.online"
+    return "https://redilrestauracion.totalappgt.com"
 
 def _formatear_whatsapp(msg, pdf_url=""):
     sep = " | "

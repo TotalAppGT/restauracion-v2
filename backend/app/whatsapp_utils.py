@@ -13,7 +13,7 @@ WHATSAPP_API = f"https://graph.facebook.com/v22.0/{WHATSAPP_PHONE_ID}/messages" 
 PROXY_URL = os.getenv("PROXY_URL", "")
 PROXY_API_KEY = os.getenv("PROXY_API_KEY", "proxy_master_2026_secret")
 SISTEMA_NOMBRE = os.getenv("SISTEMA_NOMBRE", "REDIL")
-SISTEMA_URL = os.getenv("SISTEMA_URL", "https://redilrestauracion.totalappgt.online")
+SISTEMA_URL = os.getenv("SISTEMA_URL", "https://redilrestauracion.totalappgt.com")
 SISTEMA_WEBHOOK_URL = f"{SISTEMA_URL}/api/whatsapp/webhook"
 SISTEMA_ID = os.getenv("SISTEMA_ID", "")
 
