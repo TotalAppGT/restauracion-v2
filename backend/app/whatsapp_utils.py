@@ -4,17 +4,22 @@ import logging
 
 logger = logging.getLogger("whatsapp_utils")
 
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "EAATUvL0iC3cBSNsEmoNdwUmKBu3ZBaFhMES58Ym2onRFKMF8DwzZCe9O3N5YJDtlfHjnBYYbZBY1QBY2UnUAiO5wP6KAOwXKz500tAZApd0eHiLOVdHu7PFCmptpuWYEg4xXiib2MfhZB1cwQZAexBteGrxX8ZBlVfpAdZBq3TltNL4mekJbu2p8wNukEyT53gZDZD")
-WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "1178159198722196")
+# Regla de esta casa: NINGUN secreto vive en el codigo, ni como valor por
+# defecto. Si falta la variable, el canal queda desactivado; nunca se usa una
+# clave conocida publicamente. (El token y la URL reales ya estan como variables
+# de entorno en el servidor, asi que esto no cambia el funcionamiento.)
+WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN", "")
+WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID", "")
 WHATSAPP_TEMPLATE = os.getenv("WHATSAPP_TEMPLATE", "totalappgt_aviso")
 WHATSAPP_TEMPLATE_LANG = os.getenv("WHATSAPP_TEMPLATE_LANG", "es_MX")
 WHATSAPP_API = f"https://graph.facebook.com/v22.0/{WHATSAPP_PHONE_ID}/messages" if WHATSAPP_PHONE_ID else ""
 
 PROXY_URL = os.getenv("PROXY_URL", "")
-PROXY_API_KEY = os.getenv("PROXY_API_KEY", "proxy_master_2026_secret")
+PROXY_API_KEY = os.getenv("PROXY_API_KEY", "")
 SISTEMA_NOMBRE = os.getenv("SISTEMA_NOMBRE", "REDIL")
-SISTEMA_URL = os.getenv("SISTEMA_URL", "https://redilrestauracion.totalappgt.com")
-SISTEMA_WEBHOOK_URL = f"{SISTEMA_URL}/api/whatsapp/webhook"
+# URL publica del propio sistema (ya no un dominio fijo en el codigo).
+SISTEMA_URL = os.getenv("SISTEMA_URL", "") or os.getenv("URL_PUBLICA", "")
+SISTEMA_WEBHOOK_URL = f"{SISTEMA_URL}/api/whatsapp/webhook" if SISTEMA_URL else ""
 SISTEMA_ID = os.getenv("SISTEMA_ID", "")
 
 def _registrar_en_proxy(wamid):
