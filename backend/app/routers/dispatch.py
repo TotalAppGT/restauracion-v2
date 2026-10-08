@@ -2470,7 +2470,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "enviarNotificacionPrueba":
             from app.whatsapp_utils import send_whatsapp_template
             from datetime import datetime as dt
-            from app.models import NotificacionLog
+            # OJO: NotificacionLog ya se importa al inicio del modulo. Un import
+            # local aqui la convertia en variable local de TODA la funcion y
+            # rompia getNotificacionesLog con UnboundLocalError.
             numero = str(payload.get("numero", "") or "").replace("+", "").replace(" ", "").replace("-", "")
             if len(numero) == 8 and numero.isdigit() and not numero.startswith("502"):
                 numero = "502" + numero
