@@ -21,7 +21,8 @@ from app.email_utils import send_email
 from sqlalchemy import func
 
 router = APIRouter()
-SECRET = os.getenv("JWT_SECRET", "redil_secret_key_2026")
+# Sin valor por defecto conocido: la clave vive en la variable de entorno.
+SECRET = os.getenv("JWT_SECRET", "")
 
 def esc(s):
     return str(s or "").replace("&","&amp;").replace("<","&lt;").replace(">","&gt;").replace('"',"&quot;").replace("'","&#39;")
@@ -1149,7 +1150,11 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 if not obj: return {"ok": False, "msg": "Usuario no encontrado"}
                 for key, val in data.items(): setattr(obj, key, val)
             else:
-                if "password" not in data: data["password"] = bcrypt.hashpw(b"redil2026", bcrypt.gensalt()).decode()
+                if "password" not in data:
+                    # No se inventa una contrasena conocida. La interfaz ya exige
+                    # contrasena al crear un usuario; si alguien la omite por API,
+                    # se le asigna una aleatoria que nadie puede adivinar.
+                    data["password"] = bcrypt.hashpw(os.urandom(18).hex().encode(), bcrypt.gensalt()).decode()
                 obj = Usuario(**data)
                 db.add(obj)
             db.commit()

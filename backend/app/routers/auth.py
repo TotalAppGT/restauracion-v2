@@ -11,7 +11,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 router = APIRouter()
-SECRET = os.getenv("JWT_SECRET", "redil_secret_key_2026")
+# Sin valor por defecto conocido: la clave vive en la variable de entorno.
+SECRET = os.getenv("JWT_SECRET", "")
 
 # Rate limiting: track login attempts per IP
 login_attempts = defaultdict(list)
