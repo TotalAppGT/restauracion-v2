@@ -2445,26 +2445,25 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
         # ── ENVÍO MASIVO WHATSAPP (desde Centro Envíos) ──
         if action == "enviarWhatsappMasivo":
-            from app.whatsapp_utils import send_whatsapp_bulk, send_whatsapp_template
+            from app.whatsapp_utils import send_whatsapp_template
             numbers = payload.get("numeros", [])
             msg = payload.get("mensaje", "")
             pdf_url = payload.get("pdfUrl", "")
-            usar_plantilla = payload.get("usarPlantilla") == True
             if not numbers or not msg:
                 return {"ok": False, "msg": "Números y mensaje requeridos"}
             # Normalizar numeros
-            numbers = [("502"+n if len(str(n).replace("+","").replace(" ",""))==8 and not str(n).startswith("+") and not str(n).startswith("502") else str(n)) for n in numbers]
-            # Si hay PDF, SIEMPRE enviar como documento
-            if pdf_url and pdf_url.strip():
-                return send_whatsapp_bulk(numbers, msg, pdf_url)
-            # Sin PDF: usar template si el checkbox esta marcado
-            if usar_plantilla:
-                cn = _get_church_name(db)
-                texto_wa = _formatear_whatsapp(msg)
-                results = [send_whatsapp_template(n, params=[cn, texto_wa]) for n in numbers]
-                ok_count = sum(1 for r in results if r.get("ok"))
-                return {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(numbers)} contactos"}
-            return send_whatsapp_bulk(numbers, msg)
+            numbers = [("502"+str(n) if len(str(n).replace("+","").replace(" ",""))==8 and not str(n).startswith("+") and not str(n).startswith("502") else str(n)) for n in numbers]
+            cn = _get_church_name(db)
+            # Siempre se envia como PLANTILLA (totalappgt_aviso). Si hay reporte,
+            # se agrega el enlace en el cuerpo (los documentos/texto libre fuera de
+            # la ventana de 24h son rechazados por Meta con error 131047).
+            texto = msg
+            if pdf_url and str(pdf_url).strip():
+                texto = f"{msg} - Ver reporte: {str(pdf_url).strip()}"
+            texto_wa = _formatear_whatsapp(texto, pdf_url)
+            results = [send_whatsapp_template(n, params=[cn, texto_wa]) for n in numbers]
+            ok_count = sum(1 for r in results if r.get("ok"))
+            return {"ok": ok_count > 0, "msg": f"Plantilla enviada a {ok_count}/{len(numbers)} contactos"}
 
         # ── RECURRENTE (PAGOS) ──
         if action == "getPlanes":

@@ -1,8 +1,18 @@
 import httpx
 import os
+import re
 import logging
 
 logger = logging.getLogger("whatsapp_utils")
+
+
+def _clean_param(value):
+    """WhatsApp no admite saltos de linea, tabs ni 4+ espacios en parametros de
+    plantilla. Normaliza el texto para evitar errores de envio."""
+    s = str(value if value is not None else "")
+    s = s.replace("\r", " ").replace("\n", " ").replace("\t", " ")
+    s = re.sub(r" {2,}", " ", s).strip()
+    return s[:1000]
 
 # Regla de esta casa: NINGUN secreto vive en el codigo, ni como valor por
 # defecto. Si falta la variable, el canal queda desactivado; nunca se usa una
@@ -282,14 +292,14 @@ def send_whatsapp_template(to_number, template_name=None, params=None, internal_
                 body["template"]["components"] = [{
                     "type": "body",
                     "parameters": [
-                        {"type": "text", "text": str(params[0]), "parameter_name": "sistema"},
-                        {"type": "text", "text": str(params[1]), "parameter_name": "mensaje"}
+                        {"type": "text", "text": _clean_param(params[0]), "parameter_name": "sistema"},
+                        {"type": "text", "text": _clean_param(params[1]), "parameter_name": "mensaje"}
                     ]
                 }]
             else:
                 body["template"]["components"] = [{
                     "type": "body",
-                    "parameters": [{"type": "text", "text": str(p)} for p in params]
+                    "parameters": [{"type": "text", "text": _clean_param(p)} for p in params]
                 }]
         resp = httpx.post(
             WHATSAPP_API,
