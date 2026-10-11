@@ -7,12 +7,16 @@ logger = logging.getLogger("whatsapp_utils")
 
 
 def _clean_param(value):
-    """WhatsApp no admite saltos de linea, tabs ni 4+ espacios en parametros de
-    plantilla. Normaliza el texto para evitar errores de envio."""
+    """Normaliza el texto para parametros de plantilla de WhatsApp.
+    - Quita markdown (*negrita*) porque las plantillas no lo renderizan.
+    - WhatsApp no admite saltos de linea, tabs ni 4+ espacios: los convierte
+      en un separador limpio ' | '."""
     s = str(value if value is not None else "")
-    s = s.replace("\r", " ").replace("\n", " ").replace("\t", " ")
-    s = re.sub(r" {2,}", " ", s).strip()
-    return s[:1000]
+    s = s.replace("*", "")
+    s = s.replace("\r", " ").replace("\n", " | ").replace("\t", " ")
+    s = re.sub(r" {2,}", " ", s)
+    s = re.sub(r"(\s*\|\s*)+", " | ", s)
+    return s.strip(" |").strip()[:1000]
 
 # Regla de esta casa: NINGUN secreto vive en el codigo, ni como valor por
 # defecto. Si falta la variable, el canal queda desactivado; nunca se usa una
