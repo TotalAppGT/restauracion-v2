@@ -1710,14 +1710,34 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     d = datetime.strptime(hasta, "%Y-%m-%d").date()
                     q = q.filter(Reporte.fecha <= d)
                 except: q = q.filter(Reporte.fecha <= hasta)
-            if lider: q = q.filter(Reporte.lider.ilike(f"%{lider.strip()}%"))
-            if sup_sector: q = q.filter(Reporte.sup_sector.ilike(f"%{sup_sector.strip()}%"))
-            if sup_area: q = q.filter(Reporte.sup_area.ilike(f"%{sup_area.strip()}%"))
-            if pastor_zona: q = q.filter(Reporte.pastor_zona.ilike(f"%{pastor_zona.strip()}%"))
-            if distrito: q = q.filter(Reporte.distrito == distrito)
-            if zona: q = q.filter(Reporte.zona == zona)
-
             reportes = q.order_by(Reporte.fecha.desc(), Reporte.distrito, Reporte.zona).all()
+
+            # Resolver jerarquia desde el hermano (reportes digitales suelen venir
+            # sin distrito/zona) y aplicar filtros de dimension
+            herm_by_cod = {}
+            for h in db.query(Hermano).all():
+                if h.codigo_lead:
+                    herm_by_cod[str(h.codigo_lead).strip()] = h
+
+            def _eff(r, h, attr):
+                return str(getattr(r, attr, None) or (getattr(h, attr, None) if h else None) or "").strip()
+
+            f_dist = distrito.strip(); f_zona = zona.strip()
+            f_lider = lider.strip().lower(); f_ss = sup_sector.strip().lower()
+            f_sa = sup_area.strip().lower(); f_pz = pastor_zona.strip().lower()
+            if f_dist or f_zona or f_lider or f_ss or f_sa or f_pz:
+                filtrados = []
+                for r in reportes:
+                    h = herm_by_cod.get(str(r.codigo or "").strip())
+                    if f_dist and _eff(r, h, "distrito") != f_dist: continue
+                    if f_zona and _eff(r, h, "zona") != f_zona: continue
+                    if f_lider and f_lider not in str(r.lider or "").lower(): continue
+                    if f_ss and f_ss not in _eff(r, h, "sup_sector").lower(): continue
+                    if f_sa and f_sa not in _eff(r, h, "sup_area").lower(): continue
+                    if f_pz and f_pz not in _eff(r, h, "pastor_zona").lower(): continue
+                    filtrados.append(r)
+                reportes = filtrados
+
             total_en_db = db.query(Reporte).count()
             if not reportes:
                 # Ayudar al usuario a diagnosticar
@@ -1751,11 +1771,14 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             for r in reportes:
                 pend = r.ofrenda_recibida in ("Pendiente", "")
                 of_val = float(r.ofrenda_total or 0)
+                _h = herm_by_cod.get(str(r.codigo or "").strip())
+                _d = _eff(r, _h, "distrito") or "?"
+                _z = _eff(r, _h, "zona") or "?"
                 rows_html += f"""<tr>
                     <td><span class="cod">{esc(r.codigo or '')}</span></td>
                     <td><b>{esc(r.lider or '')}</b></td>
                     <td>{esc(str(r.fecha) if r.fecha else '')}</td>
-                    <td>D{r.distrito or '?'} Z{r.zona or '?'}</td>
+                    <td>D{esc(_d)} Z{esc(_z)}</td>
                     <td class="num">{r.asistencia or 0}</td>
                     <td class="num">Q{of_val:,.2f}</td>
                     <td class="num">{r.hnos or 0}</td>
@@ -1896,7 +1919,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                                 ry+=th
                             pdf.set_fill_color(253,254,255)if ri%2==0 else pdf.set_fill_color(246,250,254)
                             pend=r.ofrenda_recibida in("Pendiente",""); ov=float(r.ofrenda_total or 0)
-                            vs=[pdf_safe(r.codigo or'-')[:12],pdf_safe(r.lider or'-')[:28],str(r.fecha)[:10]if r.fecha else'-','D'+pdf_safe(str(r.distrito or'?'))+' Z'+pdf_safe(str(r.zona or'?')),str(r.asistencia or 0),'Q'+f'{ov:,.0f}',str(r.hnos or 0),str(r.amigos or 0),str(r.ninos or 0),'']
+                            _h2=herm_by_cod.get(str(r.codigo or '').strip()); _d2=_eff(r,_h2,"distrito") or '?'; _z2=_eff(r,_h2,"zona") or '?'
+                            vs=[pdf_safe(r.codigo or'-')[:12],pdf_safe(r.lider or'-')[:28],str(r.fecha)[:10]if r.fecha else'-','D'+pdf_safe(_d2)+' Z'+pdf_safe(_z2),str(r.asistencia or 0),'Q'+f'{ov:,.0f}',str(r.hnos or 0),str(r.amigos or 0),str(r.ninos or 0),'']
                             cv=mx
                             for vi in range(len(cd)):
                                 if vi==9:

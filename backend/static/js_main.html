@@ -1886,7 +1886,7 @@ function printRep(id){
   </body></html>`;
   const w=abrirVentanaImpresion(h);
 }
-function imprimirReportes(){loading(true);call('generarReporte',{desde:g('rD'),hasta:g('rH'),lider:g('rL')},(_,res)=>{loading(false);if(!res?.ok){toast('Error','er');return;}abrirVentanaImpresion(res.html);if(res.pdfUrl)toast('PDF guardado en Drive','ok',4000);});}
+function imprimirReportes(){loading(true);var p={desde:g('rD'),hasta:g('rH'),lider:g('rL')||'',supSector:g('rSS')||'',supArea:g('rSA')||'',pastorZona:g('rPZ')||'',distrito:g('rDist')||'',zona:g('rZona')||''};call('generarReporte',p,(_,res)=>{loading(false);if(!res?.ok){toast((res&&res.msg)||'Error','er');return;}abrirVentanaImpresion(res.html);if(res.pdfUrl)toast('PDF guardado','ok',4000);});}
 
 // Función central de impresión — compatible web y ejecutable
 function abrirVentanaImpresion(html){
@@ -1938,6 +1938,20 @@ function renderReporteDigital(el){
 // ══════════════════════════════════════════════════════════
 // FORMULARIO EXTERNO
 // ══════════════════════════════════════════════════════════
+function _copiarTexto(t){
+  try{
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){toast('Link copiado','ok');},function(){_copiarFallback(t);});return;}
+  }catch(e){}
+  _copiarFallback(t);
+}
+function _copiarFallback(t){
+  try{var ta=document.createElement('textarea');ta.value=t;ta.style.position='fixed';ta.style.opacity='0';document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');ta.remove();toast('Link copiado','ok');}catch(e){toast('No se pudo copiar','er');}
+}
+function copiarUrl(){
+  var url=(APP&&APP.formUrlPublic)||'';
+  if(!url){toast('URL no disponible','wa');return;}
+  _copiarTexto(url);
+}
 function renderFormulario(el){
   el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-clipboard-list"></i> Formulario Externo</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="copiarUrl()"><i class="fas fa-copy"></i> Copiar Link</button><a href="${APP.formUrlPublic||'#'}" target="_blank" class="btn btn-ol btn-sm"><i class="fas fa-external-link-alt"></i> Nueva pestaña</a></div></div>
   <div class="card" style="padding:0;overflow:hidden"><div id="formEmbed"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i><p>Cargando formulario...</p></div></div></div>`;
@@ -3150,7 +3164,7 @@ function delPrv(id){customConfirm('¿Estás seguro de eliminar este privilegio?'
 // ══════════════════════════════════════════════════════════
 let _dzm=[];
 function renderDiezmos(el){el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-coins"></i> Control Diezmos y Ofrendas</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newDzm()"><i class="fas fa-plus"></i> Nuevo</button><button class="btn btn-in btn-sm" onclick="exportXLS(_dzm,'Diezmos','diezmos')"><i class="fas fa-file-excel"></i> Excel</button></div></div><div class="card"><div class="fr"><div class="sb2"><i class="fas fa-search"></i><input type="text" placeholder="Buscar..." oninput="filterDzm(this.value)"></div><input type="date" class="fdt" id="dD" value="${fom()}"><input type="date" class="fdt" id="dH" value="${today()}"><select class="fsl" id="dT"><option value="">Todos</option>${['Diezmo','Ofrenda','Primera Fruta','Voto','Otro'].map(t=>`<option>${t}</option>`).join('')}</select><button class="btn btn-pr btn-sm" onclick="loadDzm()"><i class="fas fa-filter"></i></button></div><div id="dzmRes" style="display:flex;gap:8px;margin-bottom:12px"></div><div class="tw"><table><thead><tr><th>Fecha</th><th>Nombre</th><th>Teléfono</th><th>Tipo de entrega</th><th>Tipo</th><th>Monto Q</th><th>Descripción</th><th>Acciones</th></tr></thead><tbody id="dzmTb"></tbody></table></div></div>`;loadDzm();}
-function loadDzm(){call('getDiezmos',{desde:g('dD'),hasta:g('dH')},(_,d)=>{_dzm=Array.isArray(d)?d:[];renderDzmTb(_dzm);const tot=_dzm.reduce((s,x)=>s+num(x['MontoQ']),0);const el=document.getElementById('dzmRes');if(el)el.innerHTML=`<div class="rc" style="flex:1;padding:10px"><div class="rcv">${_dzm.length}</div><div class="rcl">Registros</div></div><div class="rc p" style="flex:1;padding:10px"><div class="rcv">${fmtQ(tot)}</div><div class="rcl">Total</div></div>`;});}
+function loadDzm(){var tipo=(document.getElementById('dT')||{}).value||'';call('getDiezmos',{desde:g('dD'),hasta:g('dH')},(_,d)=>{_dzm=Array.isArray(d)?d:[];if(tipo)_dzm=_dzm.filter(function(x){return (x['Tipo']||'')===tipo;});renderDzmTb(_dzm);const tot=_dzm.reduce((s,x)=>s+num(x['MontoQ']),0);const el=document.getElementById('dzmRes');if(el)el.innerHTML=`<div class="rc" style="flex:1;padding:10px"><div class="rcv">${_dzm.length}</div><div class="rcl">Registros</div></div><div class="rc p" style="flex:1;padding:10px"><div class="rcv">${fmtQ(tot)}</div><div class="rcl">Total</div></div>`;});}
 function renderDzmTb(d){const tb=document.getElementById('dzmTb');if(!tb)return;if(!d.length){tb.innerHTML=`<tr><td colspan="8"><div class="empty-r"><i class="fas fa-coins"></i><p>Sin registros</p></div></td></tr>`;return;}tb.innerHTML=d.map(x=>`<tr><td>${fmtD(x['Fecha'])}</td><td><b>${esc(x['Nombre'])}</b></td><td>${esc(x['Telefono'])}</td><td>${esc(x['Grupo'])}</td><td><span class="bdg ${x['Tipo']==='Diezmo'?'bb':'bg'}">${esc(x['Tipo'])}</span></td><td><b>${fmtQ(x['MontoQ'])}</b></td><td>${esc(x['Descripcion'])}</td><td><div class="ab"><button class="ab-btn ab-ed" onclick="editDzm('${esc(x['ID'])}')"><i class="fas fa-edit"></i></button><button class="ab-btn ab-del" onclick="delDzm('${esc(x['ID'])}')"><i class="fas fa-trash"></i></button></div></td></tr>`).join('');}
 function filterDzm(q){renderDzmTb(_dzm.filter(x=>JSON.stringify(x).toLowerCase().includes(q.toLowerCase())));}
 function dzmForm(d){d=d||{};return `<div class="fg2"><div class="fgg"><label>Fecha <span class="req">*</span></label><input class="fc" type="date" id="df_f" value="${d['Fecha']||today()}"></div><div class="fgg"><label>Nombre <span class="req">*</span></label><input class="fc" id="df_n" value="${esc(d['Nombre']||'')}"></div><div class="fgg"><label>Teléfono</label><input class="fc" id="df_t" value="${esc(d['Telefono']||'')}"></div><div class="fgg"><label>Tipo de Entrega</label><select class="fc" id="df_g">${['','Física','Transferencia','Otros'].map(op=>`<option value="${op}" ${d['Grupo']===op?'selected':''}>${op||'-- Seleccionar --'}</option>`).join('')}</select></div><div class="fgg"><label>Tipo <span class="req">*</span></label><select class="fc" id="df_ti">${['Diezmo','Ofrenda','Primera Fruta','Voto','Otro'].map(t=>`<option ${d['Tipo']===t?'selected':''}>${t}</option>`).join('')}</select></div><div class="fgg"><label>Monto (Q) <span class="req">*</span></label><input class="fc" type="number" min="0" step="0.01" id="df_m" value="${d['MontoQ']||''}"></div><div class="fgg full"><label>Descripción</label><textarea class="fc" id="df_d" rows="2">${esc(d['Descripcion']||'')}</textarea></div></div>`;}
