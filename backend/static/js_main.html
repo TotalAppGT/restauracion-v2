@@ -1034,6 +1034,10 @@ function renderReportes(el){
           <option value="">🏛 Distrito: Todos</option>
           ${[...new Set(APP.hermanos.map(h=>h['Distrito']).filter(Boolean))].sort().map(n=>`<option value="${esc(n)}">Distrito ${esc(n)}</option>`).join('')}
         </select>
+        <select class="fsl" id="rZona" style="flex:1;min-width:110px" onchange="actualizarSelectores()">
+          <option value="">Zona: Todas</option>
+          ${[...new Set(APP.hermanos.map(h=>h['Zona']).filter(Boolean))].sort().map(n=>`<option value="${esc(n)}">Zona ${esc(n)}</option>`).join('')}
+        </select>
         <select class="fsl" id="rPZ" style="flex:1;min-width:130px" onchange="actualizarSelectores()">
           <option value="">🏛 Pastor Zona: Todos</option>
           ${[...new Set(APP.hermanos.map(h=>h['Pastor Zona']).filter(Boolean))].sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
@@ -1431,7 +1435,7 @@ function loadRep(){
   var l=g('rL'),ss=g('rSS'),pz=g('rPZ'),di=g('rDist'),zo=g('rZona');
   if(l)f.lider=l;if(ss)f.supSector=ss;if(pz)f.pastorZona=pz;
   if(di)f.distrito=di;if(zo)f.zona=zo;if(g('rPend'))f.pendientes=true;
-  var ck='rpt_'+f.desde+'_'+f.hasta+(f.pastorZona?'_pz:'+f.pastorZona:'')+(f.supSector?'_ss:'+f.supSector:'')+(f.distrito?'_di:'+f.distrito:'')+(f.lider?'_ld:'+f.lider:'');
+  var ck='rpt_v2_'+f.desde+'_'+f.hasta+(f.pastorZona?'_pz:'+f.pastorZona:'')+(f.supSector?'_ss:'+f.supSector:'')+(f.distrito?'_di:'+f.distrito:'')+(f.zona?'_zo:'+f.zona:'')+(f.lider?'_ld:'+f.lider:'');
   var cached=sessionStorage.getItem(ck);
   var v=parseInt(sessionStorage.getItem('rpt_ver')||'0');
   if(cached&&Date.now()-parseInt(sessionStorage.getItem(ck+'_t')||'0')<30000){
@@ -1441,7 +1445,7 @@ function loadRep(){
 }
 
 function limpiarFiltrosRep(){
-  ['rDist','rPZ','rSA','rSS','rL'].forEach(id=>{
+  ['rDist','rZona','rPZ','rSA','rSS','rL'].forEach(id=>{
     const el=document.getElementById(id);
     if(el)el.value='';
   });
@@ -1485,6 +1489,19 @@ function renderRepRes(d){
   const pend=d.filter(r=>r['Ofrenda Recibida']==='Pendiente'||r['Ofrenda Recibida']==='').length;
   const res={total:d.length,asist:d.reduce((s,r)=>s+num(r['Asistencia Grupo Familiar']),0),ofIg:d.reduce((s,r)=>s+num(r['Ofrenda Iglesia']),0),ofBus:d.reduce((s,r)=>s+num(r['Ofrenda Bus']),0),ofTot:d.reduce((s,r)=>s+num(r['Ofrenda Total']),0),tot:d.reduce((s,r)=>s+num(r['Total']),0)};
   el.innerHTML=[{l:'Reportes',v:res.total,c:''},{l:'Asist. GF',v:res.asist,c:'g'},{l:'Ofr. Iglesia',v:fmtQ(res.ofIg),c:'o'},{l:'Ofr. Bus',v:fmtQ(res.ofBus),c:'p'},{l:'Ofr. Total',v:fmtQ(res.ofTot),c:'r'},{l:'Total Cultos',v:res.tot,c:'i'},{l:'⚠ Pendientes',v:pend,c:'r'}].map(s=>`<div class="rc ${s.c}"><div class="rcv">${s.v}</div><div class="rcl">${s.l}</div></div>`).join('');
+  // Desglose por Distrito y por Zona (conteo de grupos)
+  function desglose(key,label){
+    var map={};
+    d.forEach(function(r){var k=(r[key]||'').trim()||'S/D';if(!map[k])map[k]={n:0,asist:0,ofr:0};map[k].n++;map[k].asist+=num(r['Asistencia Grupo Familiar']);map[k].ofr+=num(r['Ofrenda Total']);});
+    var keys=Object.keys(map).sort(function(a,b){return (parseInt(a)||999)-(parseInt(b)||999);});
+    if(!keys.length)return '';
+    var rows=keys.map(function(k){return '<tr><td style="text-align:left;font-weight:700">'+label+' '+esc(k)+'</td><td>'+map[k].n+'</td><td>'+map[k].asist+'</td><td>'+fmtQ(map[k].ofr)+'</td></tr>';}).join('');
+    return '<table style="width:100%;border-collapse:collapse;font-size:12px;margin-top:8px"><thead><tr style="background:#eef2f8"><th style="text-align:left;padding:4px 8px">'+label+'</th><th style="padding:4px 8px">Grupos</th><th style="padding:4px 8px">Asistencia</th><th style="padding:4px 8px">Ofrenda</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
+  el.innerHTML+='<div style="grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px">'
+    +'<div>'+desglose('Distrito','Distrito')+'</div>'
+    +'<div>'+desglose('Zona','Zona')+'</div>'
+    +'</div>';
 }
 function renderRepTable(){
   const data=getVisibleRep();
@@ -5873,6 +5890,8 @@ function renderCuadre(el){
   <div class="card" style="padding:0">
     <div style="padding:12px 16px;border-bottom:1px solid var(--brd);display:flex;gap:10px;align-items:center;flex-wrap:wrap">
       <div class="sb2" style="flex:1;min-width:180px"><i class="fas fa-search"></i><input type="text" id="cuaBuscar" placeholder="Buscar líder..." oninput="filtrarCuadre(this.value)"></div>
+      <select id="cuaDist" class="fsl" onchange="filtrarCuadre()"><option value="">Distrito: Todos</option></select>
+      <select id="cuaZona" class="fsl" onchange="filtrarCuadre()"><option value="">Zona: Todas</option></select>
       <select id="cuaFiltro" class="fsl" onchange="filtrarCuadre()">
         <option value="">Todos</option>
         <option value="entregaron">✓ Ofrenda Recibida</option>
@@ -5902,6 +5921,10 @@ function cargarCuadreDominical(){
     if(!res||!res.ok){toast('Error al cargar cuadre','er');return;}
     _cuadreData=res.data||[];
     _cuadreAgrupado=res.agrupado||[];
+    // Poblar selects de Distrito y Zona
+    var distSel=document.getElementById('cuaDist'), zonaSel=document.getElementById('cuaZona');
+    if(distSel){var ds=[...new Set((_cuadreData||[]).map(function(r){return (r.distrito||'').trim();}).filter(Boolean))].sort(function(a,b){return (parseInt(a)||999)-(parseInt(b)||999);});var curD=distSel.value;distSel.innerHTML='<option value="">Distrito: Todos</option>'+ds.map(function(d){return '<option value="'+esc(d)+'">Distrito '+esc(d)+'</option>';}).join('');distSel.value=curD;}
+    if(zonaSel){var zs=[...new Set((_cuadreData||[]).map(function(r){return (r.zona||'').trim();}).filter(Boolean))].sort(function(a,b){return (parseInt(a)||999)-(parseInt(b)||999);});var curZ=zonaSel.value;zonaSel.innerHTML='<option value="">Zona: Todas</option>'+zs.map(function(z){return '<option value="'+esc(z)+'">Zona '+esc(z)+'</option>';}).join('');zonaSel.value=curZ;}
     document.getElementById('cuaTotal').textContent=res.totalLideres||0;
     document.getElementById('cuaEntregaron').textContent=res.entregaron||0;
     document.getElementById('cuaPendienteEntrega').textContent=res.pendienteEntrega||0;
@@ -5937,8 +5960,12 @@ function renderCuadreTable(data){
 function filtrarCuadre(q){
   q=q||document.getElementById('cuaBuscar')?.value||'';
   var filtro=document.getElementById('cuaFiltro')?.value||'';
+  var fDist=document.getElementById('cuaDist')?.value||'';
+  var fZona=document.getElementById('cuaZona')?.value||'';
   var data=_cuadreData||[];
   if(q)data=data.filter(function(r){return (r.nombre||'').toLowerCase().includes(q.toLowerCase())||(r.codigo||'').includes(q);});
+  if(fDist)data=data.filter(function(r){return (r.distrito||'').trim()===fDist;});
+  if(fZona)data=data.filter(function(r){return (r.zona||'').trim()===fZona;});
   if(filtro==='entregaron')data=data.filter(function(r){return r.tieneReporte&&r.ofrendaRecibida;});
   else if(filtro==='pendienteEntrega')data=data.filter(function(r){return r.tieneReporte&&!r.ofrendaRecibida;});
   else if(filtro==='pendientes')data=data.filter(function(r){return !r.tieneReporte;});

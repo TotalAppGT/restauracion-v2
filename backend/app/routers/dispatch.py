@@ -716,8 +716,60 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 q = q.filter(Reporte.fecha <= payload["hasta"])
             if payload.get("codigo"):
                 q = q.filter(Reporte.codigo == payload["codigo"])
-            reportes = q.order_by(Reporte.fecha.desc()).limit(500).all()
-            return [{"ID": r.id, "Codigo": r.codigo, "Lider": r.lider, "Fecha": str(r.fecha) if r.fecha else "", "Distrito": r.distrito, "Zona": r.zona, "Area": r.area, "Sector": r.sector, "Grupo": r.grupo, "Ofrenda Total": float(r.ofrenda_total or 0), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Asistencia Grupo Familiar": r.asistencia or 0, "Hnos": r.hnos or 0, "Amigos": r.amigos or 0, "Niños": r.ninos or 0, "Tipo de Reporte": r.tipo_reporte or "", "Origen": r.reporte_origen or "Fisico", "Sup Sector": r.sup_sector or "", "Sup Area": r.sup_area or "", "Pastor Zona": r.pastor_zona or "", "Anfitrion": r.anfitrion or "", "Direccion": r.direccion or "", "Hora Inicio": r.hora_inicio or "", "Hora Final": r.hora_final or "", "Ofrenda Iglesia": float(r.ofrenda_iglesia or 0), "Ofrenda Bus": float(r.ofrenda_bus or 0), "Total": r.total_cultos or 0, "Martes": r.martes or 0, "Jueves": r.jueves or 0, "Domingo": r.domingo or 0, "Reporte": r.reporte_origen or ""} for r in reportes]
+            reportes = q.order_by(Reporte.fecha.desc()).limit(5000).all()
+
+            # Resolver jerarquia desde el hermano (los reportes digitales suelen
+            # venir sin distrito/zona/area; se completan desde el lider por codigo)
+            herm_by_cod = {}
+            for h in db.query(Hermano).all():
+                if h.codigo_lead:
+                    herm_by_cod[str(h.codigo_lead).strip()] = h
+
+            f_dist = str(payload.get("distrito", "") or "").strip()
+            f_zona = str(payload.get("zona", "") or "").strip()
+            f_lider = str(payload.get("lider", "") or "").strip().lower()
+            f_ss = str(payload.get("supSector", "") or "").strip().lower()
+            f_sa = str(payload.get("supArea", "") or "").strip().lower()
+            f_pz = str(payload.get("pastorZona", "") or "").strip().lower()
+            f_area = str(payload.get("area", "") or "").strip()
+            f_sector = str(payload.get("sector", "") or "").strip()
+            f_grupo = str(payload.get("grupo", "") or "").strip()
+
+            def _r(r, h, attr, hattr):
+                return str(getattr(r, attr, None) or (getattr(h, hattr, None) if h else None) or "").strip()
+
+            out = []
+            for r in reportes:
+                h = herm_by_cod.get(str(r.codigo or "").strip())
+                eff_dist = _r(r, h, "distrito", "distrito")
+                eff_zona = _r(r, h, "zona", "zona")
+                eff_area = _r(r, h, "area", "area")
+                eff_sector = _r(r, h, "sector", "sector")
+                eff_grupo = _r(r, h, "grupo", "grupo")
+                eff_ss = _r(r, h, "sup_sector", "sup_sector")
+                eff_sa = _r(r, h, "sup_area", "sup_area")
+                eff_pz = _r(r, h, "pastor_zona", "pastor_zona")
+                if f_dist and eff_dist != f_dist: continue
+                if f_zona and eff_zona != f_zona: continue
+                if f_area and eff_area != f_area: continue
+                if f_sector and eff_sector != f_sector: continue
+                if f_grupo and eff_grupo != f_grupo: continue
+                if f_lider and f_lider not in str(r.lider or "").lower(): continue
+                if f_ss and f_ss not in eff_ss.lower(): continue
+                if f_sa and f_sa not in eff_sa.lower(): continue
+                if f_pz and f_pz not in eff_pz.lower(): continue
+                out.append({"ID": r.id, "Codigo": r.codigo, "Lider": r.lider, "Fecha": str(r.fecha) if r.fecha else "",
+                            "Distrito": eff_dist, "Zona": eff_zona, "Area": eff_area, "Sector": eff_sector, "Grupo": eff_grupo,
+                            "Ofrenda Total": float(r.ofrenda_total or 0), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente",
+                            "Asistencia Grupo Familiar": r.asistencia or 0, "Hnos": r.hnos or 0, "Amigos": r.amigos or 0, "Niños": r.ninos or 0,
+                            "Tipo de Reporte": r.tipo_reporte or "", "Origen": r.reporte_origen or "Fisico",
+                            "Sup Sector": eff_ss, "Sup Area": eff_sa, "Pastor Zona": eff_pz,
+                            "Anfitrion": r.anfitrion or (h.anfitrion if h else "") or "", "Direccion": r.direccion or (h.direccion if h else "") or "",
+                            "Hora Inicio": r.hora_inicio or "", "Hora Final": r.hora_final or "",
+                            "Ofrenda Iglesia": float(r.ofrenda_iglesia or 0), "Ofrenda Bus": float(r.ofrenda_bus or 0),
+                            "Total": r.total_cultos or 0, "Martes": r.martes or 0, "Jueves": r.jueves or 0, "Domingo": r.domingo or 0,
+                            "Reporte": r.reporte_origen or ""})
+            return out
 
         if action == "saveReporte":
             item_id = payload.get("ID") or payload.get("id")
