@@ -947,7 +947,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return {"ok": True}
 
         if action == "changePassword":
-            import re
             email = payload.get("email", "")
             old_password = payload.get("old_password", "")
             new_password = payload.get("new_password", "")
