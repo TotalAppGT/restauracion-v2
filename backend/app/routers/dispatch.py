@@ -465,6 +465,8 @@ def db_to_gas(obj, field_map):
 
 def save_entity(db, model_class, field_map, payload, id_key="ID"):
     item_id = payload.get(id_key)
+    if not item_id:
+        item_id = payload.get("id") or payload.get("ID")
     data = payload_to_kwargs(field_map, payload)
     if not item_id:
         data.pop("id", None)

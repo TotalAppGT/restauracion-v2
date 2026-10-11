@@ -3690,7 +3690,7 @@ function editCnt(id){
     `<button class="btn btn-ol" onclick="closeModal()">Cancelar</button><button class="btn btn-pr" onclick="saveCnt('${esc(id)}')"><i class="fas fa-save"></i> Actualizar</button>`
   );
 }
-function saveCnt(id){const data={'IDContacto':id||null,'Nombre':g('cf_n'),'Correo':g('cf_c'),'WhatsApp':g('cf_w')};if(!data['Nombre']){toast('Nombre requerido','wa');return;}loading(true);call('saveContacto',data,(_,res)=>{loading(false);if(res?.ok){toast('Guardado','ok');closeModal();loadCnt();}});}
+function saveCnt(id){const data={'ID':id||null,'Nombre':g('cf_n'),'Correo':g('cf_c'),'WhatsApp':g('cf_w')};if(!data['Nombre']){toast('Nombre requerido','wa');return;}loading(true);call('saveContacto',data,(_,res)=>{loading(false);if(res?.ok){toast('Guardado','ok');closeModal();loadCnt();}});}
 function delCnt(id){customConfirm('¿Estás seguro de eliminar este contacto?',function(ok){if(ok){loading(true);call('deleteContacto',{ID:id},(_,res)=>{loading(false);if(res&&res.ok){toast('Eliminado','ok');loadCnt();}else{toast('Error al eliminar: '+(res&&res.msg||'Desconocido'),'er');}});}},{icon:'fa-trash-alt',color:'#e74c3c',danger:true});}
 function vaciarContactos(){customConfirm('¿Eliminar TODOS los contactos? Esta accion no se puede deshacer.',function(ok){if(ok){loading(true);call('deleteAllContactos',{},(_,res)=>{loading(false);if(res&&res.ok){toast(res.msg,'ok');loadCnt();recargarEnvio();}else{toast('Error: '+(res&&res.msg||''),'er');}});}},{icon:'fa-trash-alt',color:'#e74c3c',danger:true});}
 
