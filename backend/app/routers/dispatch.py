@@ -1259,9 +1259,20 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         # ── CUADRE DOMINICAL ──
         if action == "getCuadreDominical":
             fecha = payload.get("fecha", "")
+            desde = str(payload.get("desde", "") or "").strip()
+            hasta = str(payload.get("hasta", "") or "").strip()
             lideres = db.query(Hermano).filter(Hermano.codigo_lead != None).all()
             reportes_q = db.query(Reporte)
-            if fecha:
+            # Rango de fechas: si vienen desde/hasta se usan directo; si no, la semana de 'fecha'
+            if desde or hasta:
+                try:
+                    if desde:
+                        reportes_q = reportes_q.filter(Reporte.fecha >= datetime.strptime(desde, "%Y-%m-%d").date())
+                    if hasta:
+                        reportes_q = reportes_q.filter(Reporte.fecha <= datetime.strptime(hasta, "%Y-%m-%d").date())
+                except Exception:
+                    pass
+            elif fecha:
                 try:
                     d = datetime.strptime(fecha, "%Y-%m-%d").date()
                     ini = d - timedelta(days=d.weekday())  # Lunes

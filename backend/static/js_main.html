@@ -5897,9 +5897,18 @@ function renderCuadre(el){
   </div>
   <div id="cuaSemanaSelector" style="margin-bottom:14px">
     <div class="card" style="padding:12px 16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <span style="font-weight:700;font-size:13px"><i class="fas fa-calendar-week"></i> Semana:</span>
-      <input type="date" id="cuaFecha" class="fc" style="width:160px" onchange="cargarCuadreDominical()">
-      <span style="font-size:12px;color:var(--tx2)">(Selecciona cualquier día de la semana)</span>
+      <span style="font-weight:700;font-size:13px"><i class="fas fa-calendar-week"></i> Periodo:</span>
+      <select id="cuaPeriodo" class="fc" style="width:210px" onchange="setCuadrePeriodo()">
+        <option value="semana" selected>Semana (cierre dominical)</option>
+        <option value="mes">Este Mes</option>
+        <option value="trimestre">Este Trimestre</option>
+        <option value="personalizado">Rango personalizado</option>
+      </select>
+      <input type="date" id="cuaFecha" class="fc" style="width:150px" onchange="setCuadrePeriodo()" title="Día de referencia">
+      <span style="font-size:12px;color:var(--tx2)">Desde</span>
+      <input type="date" id="cuaDesde" class="fc" style="width:150px" onchange="cargarCuadreDominical()">
+      <span style="font-size:12px;color:var(--tx2)">Hasta</span>
+      <input type="date" id="cuaHasta" class="fc" style="width:150px" onchange="cargarCuadreDominical()">
     </div>
   </div>
   <div class="card" style="padding:0">
@@ -5920,21 +5929,25 @@ function renderCuadre(el){
       <tbody id="cuaTb"></tbody>
     </table></div>
   </div>`;
-  var todayStr=today();
   var fe=document.getElementById('cuaFecha');
-  if(fe)fe.value=todayStr;
-  cargarCuadreDominical();
+  if(fe)fe.value=today();
+  setCuadrePeriodo();
 }
 
 var _cuadreData=null;
 var _cuadreFiltrado=[];
 var _cuadreFecha='';
+var _cuadreHasta='';
 function cargarCuadreDominical(){
   var fechaEl=document.getElementById('cuaFecha');
+  var desdeEl=document.getElementById('cuaDesde');
+  var hastaEl=document.getElementById('cuaHasta');
   var fecha=fechaEl?fechaEl.value:today();
-  if(!fecha){toast('Selecciona una fecha','wa');return;}
+  var desde=desdeEl?desdeEl.value:'';
+  var hasta=hastaEl?hastaEl.value:'';
+  if(!desde||!hasta){toast('Selecciona el rango de fechas','wa');return;}
   loading(true);
-  call('getCuadreDominical',{fecha:fecha},function(_,res){
+  call('getCuadreDominical',{fecha:fecha,desde:desde,hasta:hasta},function(_,res){
     loading(false);
     if(!res||!res.ok){toast('Error al cargar cuadre','er');return;}
     _cuadreData=res.data||[];
@@ -5948,7 +5961,8 @@ function cargarCuadreDominical(){
     document.getElementById('cuaPendienteEntrega').textContent=res.pendienteEntrega||0;
     document.getElementById('cuaPendientes').textContent=res.pendientes||0;
     document.getElementById('cuaOfrenda').textContent='Q '+(res.ofrendaTotal||0).toFixed(2);
-    _cuadreFecha=fecha;
+    _cuadreFecha=desde;
+    _cuadreHasta=hasta;
     filtrarCuadre();
   });
 }
@@ -6123,13 +6137,33 @@ function exportCuadreExcel(){
   exportXLS(rows,'Cuadre Dominical','cuadre_dominical');
 }
 function _cuadreSemanaTxt(){
+  var fl=function(x){return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')+'/'+x.getFullYear();};
+  if(_cuadreFecha&&_cuadreHasta){
+    try{
+      var a=new Date(_cuadreFecha+'T12:00:00'), b=new Date(_cuadreHasta+'T12:00:00');
+      var dias=Math.round((b-a)/86400000)+1;
+      var pref=(dias<=7)?'Semana del ':'Del ';
+      return pref+fl(a)+' al '+fl(b);
+    }catch(e){}
+  }
   var f=_cuadreFecha||today();
   try{
     var d=new Date(f+'T12:00:00'); var dia=d.getDay(); var dif=dia===0?6:dia-1;
     var l=new Date(d); l.setDate(d.getDate()-dif); var dm=new Date(l); dm.setDate(l.getDate()+6);
-    var fl=function(x){return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')+'/'+x.getFullYear();};
     return 'Semana del '+fl(l)+' al '+fl(dm);
-  }catch(e){return 'Semana '+f;}
+  }catch(e){return 'Periodo '+f;}
+}
+function _cuadreFechaLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function setCuadrePeriodo(){
+  var p=(document.getElementById('cuaPeriodo')||{}).value||'semana';
+  var fEl=document.getElementById('cuaFecha'), dEl=document.getElementById('cuaDesde'), hEl=document.getElementById('cuaHasta');
+  if(!fEl||!dEl||!hEl)return;
+  var ref=fEl.value?new Date(fEl.value+'T12:00:00'):new Date();
+  if(p==='mes'){ dEl.value=_cuadreFechaLocal(new Date(ref.getFullYear(),ref.getMonth(),1)); hEl.value=_cuadreFechaLocal(new Date(ref.getFullYear(),ref.getMonth()+1,0)); }
+  else if(p==='trimestre'){ var q=Math.floor(ref.getMonth()/3)*3; dEl.value=_cuadreFechaLocal(new Date(ref.getFullYear(),q,1)); hEl.value=_cuadreFechaLocal(new Date(ref.getFullYear(),q+3,0)); }
+  else if(p==='personalizado'){ /* usa lo que el usuario ponga en Desde/Hasta */ }
+  else { var dia=ref.getDay(); var dif=dia===0?6:dia-1; var l=new Date(ref); l.setDate(ref.getDate()-dif); var dm=new Date(l); dm.setDate(l.getDate()+6); dEl.value=_cuadreFechaLocal(l); hEl.value=_cuadreFechaLocal(dm); }
+  cargarCuadreDominical();
 }
 function _buildCuadreHTML(){
   var data=_cuadreFiltrado||_cuadreData||[];
