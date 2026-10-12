@@ -2003,7 +2003,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             meta_total = meta_adultos + meta_ninos
 
             def zkey(d, z): return (str(d or "").strip(), str(z or "").strip())
-            def zblank(): return {"inicio": 0, "nuevo_set": set(), "hechos": set(), "adultos": 0, "ninos": 0, "conv_gru": 0, "rec_gru": 0, "visitas": 0, "pastor_zona": ""}
+            def zblank(): return {"inicio": 0, "nuevo_set": set(), "hechos": set(), "adultos": 0, "ninos": 0,
+                                  "conv_gru": 0, "conv_igle": 0, "visitas": 0, "bautizados": 0, "rec_gru": 0, "rec_igle": 0,
+                                  "pastor_zona": ""}
 
             zonas = {}
             lider_nombre_a_zona = {}
@@ -2031,87 +2033,78 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 if pd_.nombre_pastor_distrito:
                     pastor_distrito_map[str(pd_.distrito or "").strip()] = str(pd_.nombre_pastor_distrito).strip()
 
+            # Mapa de hermanos por codigo (para resolver distrito/zona de reportes digitales)
+            herm_by_cod = {}
+            for h in db.query(Hermano).all():
+                if h.codigo_lead: herm_by_cod[str(h.codigo_lead).strip()] = h
+
             # Codigos que ya reportaron antes del periodo (para calcular NUEVO)
             codigos_antes = set()
             if d_desde:
                 codigos_antes = set(x[0] for x in db.query(Reporte.codigo).filter(Reporte.fecha < d_desde, Reporte.codigo != None).all())
 
-            # Reportes del periodo -> HECHOS, ADULTOS, NIÑOS, NUEVO
+            # Reportes del periodo -> HECHOS, ADULTOS, NIÑOS, NUEVO (resolviendo D/Z desde el lider)
             for r in reportes:
-                k = zkey(r.distrito, r.zona)
+                h = herm_by_cod.get(str(r.codigo or "").strip())
+                d_ = str(r.distrito or (h.distrito if h else "") or "").strip()
+                z_ = str(r.zona or (h.zona if h else "") or "").strip()
+                if not d_ and not z_: continue
+                k = zkey(d_, z_)
                 if k not in zonas: zonas[k] = zblank()
                 zz = zonas[k]
-                if r.pastor_zona: zz["pastor_zona"] = zz["pastor_zona"] or str(r.pastor_zona).strip()
-                if r.codigo:
-                    ck = str(r.codigo)
+                pz = str(r.pastor_zona or (h.pastor_zona if h else "") or "").strip()
+                if pz and not zz["pastor_zona"]: zz["pastor_zona"] = pz
+                ck = str(r.codigo or "")
+                if ck:
                     zz["hechos"].add(ck)
                     if ck not in codigos_antes: zz["nuevo_set"].add(ck)
                 zz["adultos"] += (r.hnos or 0) + (r.amigos or 0)
                 zz["ninos"] += (r.ninos or 0)
                 if r.lider: lider_nombre_a_zona.setdefault(str(r.lider).strip().upper(), k)
 
-            # Seguimientos del periodo -> FRUTOS (mapeo por responsable)
+            # Seguimientos del periodo -> FRUTOS por zona (responsable -> zona)
             qseg = db.query(Seguimiento)
             if d_desde: qseg = qseg.filter(Seguimiento.fecha >= d_desde)
             if d_hasta: qseg = qseg.filter(Seguimiento.fecha <= d_hasta)
-            frutos_global = {"conv": 0, "rec": 0, "vis": 0}
+            def _fruto_field(t):
+                t = (t or "").lower()
+                if "convert" in t: return "conv_gru"
+                if "reconcil" in t: return "rec_gru"
+                if "visita" in t: return "visitas"
+                if "bautiz" in t: return "bautizados"
+                return None
             for s in qseg.all():
-                t = (s.tipo or "").lower()
+                fld = _fruto_field(s.tipo)
+                if not fld: continue
                 k = lider_nombre_a_zona.get((s.responsable or "").strip().upper())
-                if k and k in zonas:
-                    if t == "convertido": zonas[k]["conv_gru"] += 1
-                    elif "reconcil" in t: zonas[k]["rec_gru"] += 1
-                    elif "visita" in t: zonas[k]["visitas"] += 1
-                else:
-                    if t == "convertido": frutos_global["conv"] += 1
-                    elif "reconcil" in t: frutos_global["rec"] += 1
-                    elif "visita" in t: frutos_global["vis"] += 1
-
-            # Bautizos del periodo
-            bq = db.query(Bautizo)
-            if d_desde: bq = bq.filter(Bautizo.fecha >= d_desde)
-            if d_hasta: bq = bq.filter(Bautizo.fecha <= d_hasta)
-            total_bautizados = bq.count()
+                if k and k in zonas: zonas[k][fld] += 1
 
             def zsort(items):
                 return sorted(items, key=lambda k: (int(k[0]) if k[0].isdigit() else 99999, k[0], int(k[1]) if k[1].isdigit() else 99999, k[1]))
 
-            # Construir filas por zona + totales por distrito + total general
+            # Construir estructura agrupada por distrito (zonas + subtotal)
             FIELDS = ("inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle")
-            filas = []
-            dist_tot = {}
-            tg = {f: 0 for f in FIELDS}
+            dist_zonas = {}
             for (d, z) in zsort(list(zonas.keys())):
                 zz = zonas[(d, z)]
-                inicio = zz["inicio"]
-                nuevo = len(zz["nuevo_set"])
-                hechos = len(zz["hechos"])
-                total = inicio + nuevo
-                fila = {
-                    "zona": z, "distrito": d, "pastor": zz["pastor_zona"],
-                    "inicio": inicio, "nuevo": nuevo, "cerrado": 0, "cubierto": 0, "total": total,
-                    "hechos": hechos, "no_hechos": hechos - total,
-                    "adultos": zz["adultos"], "ninos": zz["ninos"],
-                    "conv_gru": zz["conv_gru"], "conv_igle": 0, "visitas": zz["visitas"],
-                    "bautizados": 0, "rec_gru": zz["rec_gru"], "rec_igle": 0
-                }
-                filas.append(fila)
-                dt = dist_tot.setdefault(d, dict(tg, distrito=d))
-                for f in FIELDS:
-                    dt[f] += fila[f]
-                for f in FIELDS:
-                    tg[f] += fila[f]
-            tg["bautizados"] = total_bautizados
-            tg["conv_gru"] += frutos_global["conv"]
-            tg["rec_gru"] += frutos_global["rec"]
-            tg["visitas"] += frutos_global["vis"]
-
-            # Nombre de pastor de distrito por distrito
-            dist_list = []
-            for dk in sorted(dist_tot.keys(), key=lambda x: (int(x) if x.isdigit() else 99999, x)):
-                dt = dist_tot[dk]
-                dt["pastor_distrito"] = pastor_distrito_map.get(dk, "")
-                dist_list.append(dt)
+                inicio = zz["inicio"]; nuevo = len(zz["nuevo_set"]); hechos = len(zz["hechos"]); total = inicio + nuevo
+                fila = {"zona": z, "distrito": d, "pastor": zz["pastor_zona"],
+                        "inicio": inicio, "nuevo": nuevo, "cerrado": 0, "cubierto": 0, "total": total,
+                        "hechos": hechos, "no_hechos": hechos - total,
+                        "adultos": zz["adultos"], "ninos": zz["ninos"],
+                        "conv_gru": zz["conv_gru"], "conv_igle": zz["conv_igle"], "visitas": zz["visitas"],
+                        "bautizados": zz["bautizados"], "rec_gru": zz["rec_gru"], "rec_igle": zz["rec_igle"]}
+                dist_zonas.setdefault(d, []).append(fila)
+            bloques = []
+            tg = {f: 0 for f in FIELDS}
+            for d in sorted(dist_zonas.keys(), key=lambda x: (int(x) if x.isdigit() else 99999, x)):
+                sub = {f: 0 for f in FIELDS}
+                for fila in dist_zonas[d]:
+                    for f in FIELDS: sub[f] += fila[f]
+                bloques.append({"distrito": d, "pastor_distrito": pastor_distrito_map.get(d, ""), "zonas": dist_zonas[d], "subtotal": sub})
+                for f in FIELDS: tg[f] += sub[f]
+            filas = [f for b in bloques for f in b["zonas"]]
+            dist_list = [dict({"distrito": b["distrito"], "pastor_distrito": b["pastor_distrito"]}, **b["subtotal"]) for b in bloques]
 
             # Meta / semana anterior / presente
             pre_adultos = tg["adultos"]; pre_ninos = tg["ninos"]; pre_total = pre_adultos + pre_ninos
@@ -2143,20 +2136,19 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 b = "font-weight:700;" if bold else ""
                 return f'<td style="padding:3px 5px;text-align:center;font-size:10px;border:1px solid #b9c2d0;{b}">{s}</td>'
             body = []
-            for f in filas:
-                tds = [f'<td style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0">{esc(f["zona"])}</td>',
-                       f'<td style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0">{esc(f["pastor"])}</td>']
-                for i, c in enumerate(COLS):
-                    tds.append(cell(f[c], bold=(c == "total")))
-                body.append('<tr>' + ''.join(tds) + '</tr>')
-            # Filas de distrito
-            for d in sorted(dist_tot.keys(), key=lambda x: (int(x) if x.isdigit() else 99999, x)):
-                dt = dist_tot[d]
-                pd_nombre = pastor_distrito_map.get(d, "")
-                pd_html = f'<br><span style="font-size:8.5px;font-weight:600;color:#2c4a6e">{esc(pd_nombre)}</span>' if pd_nombre else ''
-                tds = [f'<td colspan="2" style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0;font-weight:800;background:#e8edf5">DISTRITO {esc(d)}{pd_html}</td>']
+            for b in bloques:
+                pd_nom = b["pastor_distrito"]
+                hdr = f'DISTRITO {esc(b["distrito"])}' + (f' &nbsp;·&nbsp; PASTOR DE DISTRITO: {esc(pd_nom)}' if pd_nom else '')
+                body.append(f'<tr><td colspan="17" style="background:#1a3a5c;color:#fff;font-weight:800;font-size:11px;padding:5px 8px;border:1px solid #b9c2d0">{hdr}</td></tr>')
+                for f in b["zonas"]:
+                    tds = [f'<td style="padding:3px 5px;text-align:center;font-size:10px;border:1px solid #b9c2d0">{esc(f["zona"])}</td>',
+                           f'<td style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0">{esc(f["pastor"])}</td>']
+                    for c in COLS:
+                        tds.append(cell(f[c], bold=(c == "total")))
+                    body.append('<tr>' + ''.join(tds) + '</tr>')
+                tds = [f'<td colspan="2" style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0;font-weight:800;background:#e8edf5">DISTRITO {esc(b["distrito"])}</td>']
                 for c in COLS:
-                    tds.append(cell(dt[c], bold=True))
+                    tds.append(cell(b["subtotal"][c], bold=True))
                 body.append('<tr>' + ''.join(tds) + '</tr>')
             # Total general
             tds = [f'<td colspan="2" style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0;font-weight:800;background:#d8e1ee">TOTAL GENERAL</td>']
@@ -2195,7 +2187,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
             xlsx_base64 = ""
             try:
-                xlsx_base64 = _informe_xlsx_base64(filas, dist_list, tg, {"adultos": meta_adultos, "ninos": meta_ninos, "total": meta_total, "antAdultos": ant_adultos, "antNinos": ant_ninos, "antTotal": ant_total, "preAdultos": pre_adultos, "preNinos": pre_ninos, "preTotal": pre_total, "pct": pct}, sys_nom, tipo, fecha_txt, trimestre, semana, pastor_principal)
+                xlsx_base64 = _informe_xlsx_base64(bloques, tg, {"adultos": meta_adultos, "ninos": meta_ninos, "total": meta_total, "antAdultos": ant_adultos, "antNinos": ant_ninos, "antTotal": ant_total, "preAdultos": pre_adultos, "preNinos": pre_ninos, "preTotal": pre_total, "pct": pct}, sys_nom, tipo, fecha_txt, trimestre, semana, pastor_principal)
             except Exception as e:
                 print(f"XLSX informe fallo: {e}")
 
