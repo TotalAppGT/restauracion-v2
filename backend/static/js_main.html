@@ -5859,8 +5859,9 @@ function renderCuadre(el){
   <div class="mod-acts">
     <button class="btn btn-sm" style="background:#6b7280;color:#fff" onclick="nav(reporteModPrevio||'reportes')"><i class="fas fa-arrow-left"></i> Volver</button>
     <button class="btn btn-pr btn-sm" onclick="cargarCuadreDominical()"><i class="fas fa-sync"></i> Actualizar</button>
-    <button class="btn btn-in btn-sm" onclick="exportXLS(_cuadreData||[],'Cuadre Dominical','cuadre')"><i class="fas fa-file-excel"></i> Excel</button>
-    <button class="btn btn-er btn-sm" onclick="generarCuadrePDF()"><i class="fas fa-file-pdf"></i> PDF</button>
+    <button class="btn btn-in btn-sm" onclick="exportCuadreExcel()"><i class="fas fa-file-excel"></i> Excel (filtrado)</button>
+    <button class="btn btn-er btn-sm" onclick="descargarCuadrePDF()"><i class="fas fa-file-pdf"></i> PDF (filtrado)</button>
+    <button class="btn btn-ol btn-sm" onclick="imprimirCuadre()"><i class="fas fa-print"></i> Imprimir</button>
     <button class="btn btn-ol btn-sm" id="btnAgruparCuadre" onclick="toggleAgruparCuadre()"><i class="fas fa-layer-group"></i> Agrupar por Distrito</button>
   </div></div>
   <div class="card" style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;margin-bottom:14px">
@@ -5913,8 +5914,9 @@ function renderCuadre(el){
         <option value="pendientes">⏳ Sin Reporte</option>
       </select>
     </div>
+    <div id="cuaResumen" style="padding:10px 16px;border-bottom:1px solid var(--brd);background:#f8fafd"></div>
     <div class="tw"><table>
-      <thead><tr><th>#</th><th>Código</th><th>Líder</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>Ofrenda</th><th>Estado</th></tr></thead>
+      <thead><tr><th>#</th><th>Código</th><th>Líder</th><th>D</th><th>Z</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>Ofrenda</th><th>Estado</th></tr></thead>
       <tbody id="cuaTb"></tbody>
     </table></div>
   </div>`;
@@ -5925,6 +5927,8 @@ function renderCuadre(el){
 }
 
 var _cuadreData=null;
+var _cuadreFiltrado=[];
+var _cuadreFecha='';
 function cargarCuadreDominical(){
   var fechaEl=document.getElementById('cuaFecha');
   var fecha=fechaEl?fechaEl.value:today();
@@ -5944,7 +5948,8 @@ function cargarCuadreDominical(){
     document.getElementById('cuaPendienteEntrega').textContent=res.pendienteEntrega||0;
     document.getElementById('cuaPendientes').textContent=res.pendientes||0;
     document.getElementById('cuaOfrenda').textContent='Q '+(res.ofrendaTotal||0).toFixed(2);
-    if(_mostrandoAgrupado){renderCuadreAgrupado(_cuadreAgrupado);}else{renderCuadreTable(_cuadreData);}
+    _cuadreFecha=fecha;
+    filtrarCuadre();
   });
 }
 
@@ -5952,7 +5957,7 @@ function renderCuadreTable(data){
   var tb=document.getElementById('cuaTb');if(!tb)return;
   data=data||_cuadreData||[];
   if(!data.length){
-    tb.innerHTML='<tr><td colspan="8"><div class="empty-r"><i class="fas fa-check-circle" style="color:var(--ok)"></i><p>¡Todos los líderes entregaron su reporte!</p></div></td></tr>';
+    tb.innerHTML='<tr><td colspan="10"><div class="empty-r"><i class="fas fa-check-circle" style="color:var(--ok)"></i><p>¡Todos los líderes entregaron su reporte!</p></div></td></tr>';
     return;
   }
   tb.innerHTML=data.map(function(r,i){
@@ -5963,6 +5968,7 @@ function renderCuadreTable(data){
       :'<span class="bdg br">✕ Sin Reporte</span>';
     return '<tr '+bg+'><td>'+(i+1)+'</td><td><span class="bdg bb">'+esc(r.codigo||'')+'</span></td>'
       +'<td><b>'+esc(r.nombre||'')+'</b></td>'
+      +'<td>'+esc(r.distrito||'')+'</td><td>'+esc(r.zona||'')+'</td>'
       +'<td>'+esc(r.pastorZona||'')+'</td>'
       +'<td>'+esc(r.supSector||'')+'</td>'
       +'<td>'+(tieneReporte?'<i class="fas fa-check-circle" style="color:var(--ok)"></i> Sí':'<i class="fas fa-times-circle" style="color:var(--err)"></i> No')+'</td>'
@@ -5971,6 +5977,65 @@ function renderCuadreTable(data){
   }).join('');
 }
 
+function _cuadreFiltrosTexto(){
+  var parts=[];
+  var q=(document.getElementById('cuaBuscar')||{}).value||''; if(q)parts.push('Buscar: '+q);
+  var d=(document.getElementById('cuaDist')||{}).value||''; if(d)parts.push('Distrito '+d);
+  var z=(document.getElementById('cuaZona')||{}).value||''; if(z)parts.push('Zona '+z);
+  var f=(document.getElementById('cuaFiltro')||{}).value||''; if(f)parts.push(({entregaron:'Ofrenda recibida',pendienteEntrega:'Pendiente entrega',pendientes:'Sin reporte'})[f]||f);
+  return parts.length?parts.join(' | '):'Todos los líderes';
+}
+function _agruparCuadre(data){
+  var map={};
+  (data||[]).forEach(function(r){
+    var d=(r.distrito||'').trim()||'S/D'; var z=(r.zona||'').trim()||'S/D';
+    if(!map[d])map[d]={distrito:d,totalLideres:0,entregaron:0,pendientes:0,pendienteEntrega:0,ofrendaTotal:0,zonas:{}};
+    var dg=map[d]; dg.totalLideres++; dg.ofrendaTotal+=Number(r.ofrendaTotal||0);
+    if(!r.tieneReporte)dg.pendientes++; else if(!r.ofrendaRecibida)dg.pendienteEntrega++; else dg.entregaron++;
+    if(!dg.zonas[z])dg.zonas[z]={zona:z,totalLideres:0,entregaron:0,pendientes:0,pendienteEntrega:0,ofrendaTotal:0,lideres:[]};
+    var zg=dg.zonas[z]; zg.totalLideres++; zg.ofrendaTotal+=Number(r.ofrendaTotal||0);
+    if(!r.tieneReporte)zg.pendientes++; else if(!r.ofrendaRecibida)zg.pendienteEntrega++; else zg.entregaron++;
+    zg.lideres.push(r);
+  });
+  var nk=function(a,b){return (parseInt(a)||999)-(parseInt(b)||999);};
+  return Object.keys(map).sort(nk).map(function(k){
+    var dg=map[k];
+    dg.zonas=Object.keys(dg.zonas).sort(nk).map(function(zk){var zg=dg.zonas[zk];zg.ofrendaTotal=Math.round(zg.ofrendaTotal*100)/100;return zg;});
+    dg.ofrendaTotal=Math.round(dg.ofrendaTotal*100)/100;
+    return dg;
+  });
+}
+function _cuadreTotales(data){
+  var t={n:0,ent:0,pe:0,sr:0,ofr:0,rec:0,pen:0};
+  (data||[]).forEach(function(r){
+    t.n++; t.ofr+=Number(r.ofrendaTotal||0);
+    if(!r.tieneReporte){t.sr++;t.pen+=Number(r.ofrendaTotal||0);}
+    else if(!r.ofrendaRecibida){t.pe++;t.pen+=Number(r.ofrendaTotal||0);}
+    else{t.ent++;t.rec+=Number(r.ofrendaTotal||0);}
+  });
+  t.ofr=Math.round(t.ofr*100)/100;t.rec=Math.round(t.rec*100)/100;t.pen=Math.round(t.pen*100)/100;
+  return t;
+}
+function renderCuadreResumen(data){
+  var el=document.getElementById('cuaResumen'); if(!el)return;
+  var t=_cuadreTotales(data);
+  var cards=[
+    {l:'Líderes (filtrado)',v:t.n,c:'#1a3a5c'},
+    {l:'✓ Recibidas',v:t.ent,c:'#27ae60'},
+    {l:'📝 Pend. entrega',v:t.pe,c:'#e8a020'},
+    {l:'⏳ Sin reporte',v:t.sr,c:'#e74c3c'},
+    {l:'Ofrenda recibida',v:fmtQ(t.rec),c:'#27ae60'},
+    {l:'Ofrenda pendiente',v:fmtQ(t.pen),c:'#e8a020'},
+    {l:'Ofrenda total',v:fmtQ(t.ofr),c:'#2563a8'}
+  ].map(function(c){return '<div style="background:#fff;border-radius:8px;padding:8px 12px;min-width:110px;flex:1;border-left:3px solid '+c.c+'"><div style="font-size:16px;font-weight:900;color:'+c.c+'">'+c.v+'</div><div style="font-size:10px;color:#7f8c9b">'+c.l+'</div></div>';}).join('');
+  var ag=_agruparCuadre(data);
+  var rows='';
+  ag.forEach(function(dg){
+    rows+='<tr style="background:#eef2f8;font-weight:800"><td style="text-align:left;padding:3px 6px">Distrito '+esc(dg.distrito)+'</td><td>'+dg.totalLideres+'</td><td>'+dg.entregaron+'</td><td>'+dg.pendienteEntrega+'</td><td>'+dg.pendientes+'</td><td>'+fmtQ(dg.ofrendaTotal)+'</td></tr>';
+  });
+  var tbl=ag.length?'<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px"><thead><tr style="background:#dbe7f3"><th style="text-align:left;padding:3px 6px">Subtotal por Distrito</th><th>Líderes</th><th>Recib.</th><th>Pend.Ent.</th><th>Sin Rep.</th><th>Ofrenda</th></tr></thead><tbody>'+rows+'</tbody></table>':'';
+  el.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'+cards+'</div>'+tbl;
+}
 function filtrarCuadre(q){
   q=q||document.getElementById('cuaBuscar')?.value||'';
   var filtro=document.getElementById('cuaFiltro')?.value||'';
@@ -5983,7 +6048,9 @@ function filtrarCuadre(q){
   if(filtro==='entregaron')data=data.filter(function(r){return r.tieneReporte&&r.ofrendaRecibida;});
   else if(filtro==='pendienteEntrega')data=data.filter(function(r){return r.tieneReporte&&!r.ofrendaRecibida;});
   else if(filtro==='pendientes')data=data.filter(function(r){return !r.tieneReporte;});
-  renderCuadreTable(data);
+  _cuadreFiltrado=data;
+  renderCuadreResumen(data);
+  if(_mostrandoAgrupado){renderCuadreAgrupado(_agruparCuadre(data));}else{renderCuadreTable(data);}
 }
 // ── AUTO-REFRESH ──────────────────────────────────────────
 function aplicarTema(cfg){
@@ -6022,35 +6089,89 @@ function toggleAgruparCuadre(){
   _mostrandoAgrupado=!_mostrandoAgrupado;
   var btn=document.getElementById('btnAgruparCuadre');
   if(btn)btn.innerHTML=_mostrandoAgrupado?'<i class="fas fa-list"></i> Vista Normal':'<i class="fas fa-layer-group"></i> Agrupar por Distrito';
-  if(_mostrandoAgrupado){renderCuadreAgrupado(_cuadreAgrupado);}else{renderCuadreTable(_cuadreData);}
+  var data=_cuadreFiltrado||_cuadreData||[];
+  if(_mostrandoAgrupado){renderCuadreAgrupado(_agruparCuadre(data));}else{renderCuadreTable(data);}
 }
 function renderCuadreAgrupado(agrupado){
   var tb=document.getElementById('cuaTb');if(!tb)return;
-  if(!agrupado||!agrupado.length){tb.innerHTML='<tr><td colspan="8"><div class="empty-r"><p>Sin datos agrupados</p></div></td></tr>';return;}
+  if(!agrupado||!agrupado.length){tb.innerHTML='<tr><td colspan="10"><div class="empty-r"><p>Sin datos agrupados</p></div></td></tr>';return;}
   var html='';
   agrupado.forEach(function(dg){
-    html+='<tr style="background:#1a3a5c;color:#fff"><td colspan="8"><b style="font-size:14px">Distrito '+esc(dg.distrito)+'</b> &mdash; '+dg.entregaron+'/'+dg.totalLideres+' entregaron, '+dg.pendientes+' pendientes &mdash; Q'+fmtN(dg.ofrendaTotal)+'</td></tr>';
+    html+='<tr style="background:#1a3a5c;color:#fff"><td colspan="10"><b style="font-size:14px">Distrito '+esc(dg.distrito)+'</b> &mdash; '+dg.entregaron+'/'+dg.totalLideres+' entregaron, '+dg.pendientes+' pendientes &mdash; Q'+fmtN(dg.ofrendaTotal)+'</td></tr>';
     (dg.zonas||[]).forEach(function(zg){
-      html+='<tr style="background:#eef2f8;font-weight:700"><td colspan="2"></td><td colspan="6">Zona '+esc(zg.zona)+' | '+zg.entregaron+'/'+zg.totalLideres+' entregaron | Q'+fmtN(zg.ofrendaTotal)+'</td></tr>';
+      html+='<tr style="background:#eef2f8;font-weight:700"><td colspan="2"></td><td colspan="8">Zona '+esc(zg.zona)+' | '+zg.entregaron+'/'+zg.totalLideres+' entregaron | Q'+fmtN(zg.ofrendaTotal)+'</td></tr>';
       (zg.lideres||[]).forEach(function(r){
         var tiene=r.tieneReporte;
         var bg=tiene?'':'style="background:#fff5f5"';
         var estado=tiene?(r.ofrendaRecibida?'<span class="bdg bg">Completado</span>':'<span class="bdg bo">Pend.Ofrenda</span>'):'<span class="bdg br">Sin Reporte</span>';
-        html+='<tr '+bg+'><td></td><td><span class="bdg bb">'+esc(r.codigo||'')+'</span></td><td><b>'+esc(r.nombre||'')+'</b></td><td>'+esc(r.pastorZona||'')+'</td><td>'+esc(r.supSector||'')+'</td><td>'+(tiene?'<i class="fas fa-check-circle" style="color:var(--ok)"></i> Si':'<i class="fas fa-times-circle" style="color:var(--err)"></i> No')+'</td><td>'+fmtQ(r.ofrendaTotal||0)+'</td><td>'+estado+'</td></tr>';
+        html+='<tr '+bg+'><td></td><td><span class="bdg bb">'+esc(r.codigo||'')+'</span></td><td><b>'+esc(r.nombre||'')+'</b></td><td>'+esc(r.distrito||'')+'</td><td>'+esc(r.zona||'')+'</td><td>'+esc(r.pastorZona||'')+'</td><td>'+esc(r.supSector||'')+'</td><td>'+(tiene?'<i class="fas fa-check-circle" style="color:var(--ok)"></i> Si':'<i class="fas fa-times-circle" style="color:var(--err)"></i> No')+'</td><td>'+fmtQ(r.ofrendaTotal||0)+'</td><td>'+estado+'</td></tr>';
       });
     });
   });
   tb.innerHTML=html;
 }
-function generarCuadrePDF(){
-  var fecha=document.getElementById('cuaFecha')?.value||today();
-  loading(true);
-  call('getCuadreDominical',{fecha:fecha,generarPDF:true},function(_,res){
-    loading(false);
-    if(res&&res.pdfUrl){window.open(res.pdfUrl,'_blank');toast('PDF generado: '+res.pdfSerie,'ok');}
-    else if(res&&res.pdfError){toast('Error generando PDF: '+res.pdfError,'er');}
-    else{toast('No se pudo generar el PDF','er');}
+function exportCuadreExcel(){
+  var data=_cuadreFiltrado||_cuadreData||[];
+  var rows=data.map(function(r){
+    return {
+      'Distrito': r.distrito||'', 'Zona': r.zona||'', 'Código': r.codigo||'', 'Líder': r.nombre||'',
+      'Pastor Zona': r.pastorZona||'', 'Sup. Sector': r.supSector||'',
+      'Reporte': r.tieneReporte?'Sí':'No', 'Ofrenda Q': Number(r.ofrendaTotal||0),
+      'Estado': r.tieneReporte?(r.ofrendaRecibida?'Recibida':'Pendiente Entrega'):'Sin Reporte'
+    };
   });
+  exportXLS(rows,'Cuadre Dominical','cuadre_dominical');
+}
+function _cuadreSemanaTxt(){
+  var f=_cuadreFecha||today();
+  try{
+    var d=new Date(f+'T12:00:00'); var dia=d.getDay(); var dif=dia===0?6:dia-1;
+    var l=new Date(d); l.setDate(d.getDate()-dif); var dm=new Date(l); dm.setDate(l.getDate()+6);
+    var fl=function(x){return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')+'/'+x.getFullYear();};
+    return 'Semana del '+fl(l)+' al '+fl(dm);
+  }catch(e){return 'Semana '+f;}
+}
+function _buildCuadreHTML(){
+  var data=_cuadreFiltrado||_cuadreData||[];
+  var ag=_agruparCuadre(data);
+  var t=_cuadreTotales(data);
+  var sysName=(APP.config&&APP.config.nombre)||'Iglesia Restauracion';
+  var gen=new Date().toLocaleString('es-GT');
+  var rows='';
+  ag.forEach(function(dg){
+    rows+='<tr style="background:#1a3a5c;color:#fff"><td colspan="8" style="padding:4px 6px;font-weight:800">Distrito '+esc(dg.distrito)+' &mdash; '+dg.totalLideres+' líderes | '+dg.entregaron+' recibidas | '+dg.pendienteEntrega+' pend. entrega | '+dg.pendientes+' sin reporte | '+fmtQ(dg.ofrendaTotal)+'</td></tr>';
+    dg.zonas.forEach(function(zg){
+      rows+='<tr style="background:#eef2f8;font-weight:700"><td colspan="8" style="padding:3px 6px">Zona '+esc(zg.zona)+' &mdash; '+zg.totalLideres+' líderes | '+zg.entregaron+' recibidas | '+fmtQ(zg.ofrendaTotal)+'</td></tr>';
+      zg.lideres.forEach(function(r){
+        var est=r.tieneReporte?(r.ofrendaRecibida?'<span style="color:#059669;font-weight:700">Recibida</span>':'<span style="color:#c87f00;font-weight:700">Pend. entrega</span>'):'<span style="color:#dc2626;font-weight:700">Sin reporte</span>';
+        rows+='<tr><td>'+esc(r.codigo||'')+'</td><td><b>'+esc(r.nombre||'')+'</b></td><td>'+esc(r.pastorZona||'')+'</td><td>'+esc(r.supSector||'')+'</td><td>'+(r.tieneReporte?'Sí':'No')+'</td><td style="text-align:right">'+fmtQ(r.ofrendaTotal||0)+'</td><td>'+est+'</td><td>'+esc((r.distrito||'')+'/'+(r.zona||''))+'</td></tr>';
+      });
+    });
+  });
+  rows+='<tr style="background:#dbe7f3;font-weight:900"><td colspan="5" style="padding:4px 6px;text-align:right">TOTAL GENERAL</td><td style="text-align:right">'+fmtQ(t.ofr)+'</td><td colspan="2">'+t.n+' líderes</td></tr>';
+  var kpi=[['Líderes',t.n],['Recibidas',t.ent],['Pend. entrega',t.pe],['Sin reporte',t.sr],['Ofrenda recibida',fmtQ(t.rec)],['Ofrenda pendiente',fmtQ(t.pen)],['Ofrenda total',fmtQ(t.ofr)]]
+    .map(function(k){return '<div style="background:#fff;border:1px solid #dbe3ef;border-radius:8px;padding:8px 12px;min-width:110px;flex:1;text-align:center"><div style="font-size:16px;font-weight:900;color:#1a3a5c">'+k[1]+'</div><div style="font-size:9px;color:#7f8c9b">'+k[0]+'</div></div>';}).join('');
+  return '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>'
+    +'@page{size:letter landscape;margin:0.4in}body{font-family:Arial,sans-serif;color:#1e293b;font-size:10px;margin:0}'
+    +'.hdr{background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:12px 16px}'
+    +'.hdr h1{font-size:16px;font-weight:900;margin:0 0 2px}.hdr .sub{font-size:11px;opacity:.9}'
+    +'table{width:100%;border-collapse:collapse;font-size:9px;margin-top:8px}'
+    +'th{background:#1a3a5c;color:#fff;padding:5px;text-align:center;font-size:9px}'
+    +'td{border:1px solid #d6dce8;padding:3px 6px;text-align:center}'
+    +'</style></head><body>'
+    +'<div class="hdr"><h1>'+esc(sysName)+'</h1><div class="sub">Cuadre Dominical &mdash; '+_cuadreSemanaTxt()+'</div>'
+    +'<div class="sub" style="font-size:10px;margin-top:3px">Filtros: '+esc(_cuadreFiltrosTexto())+' &nbsp;|&nbsp; Generado: '+gen+'</div></div>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'+kpi+'</div>'
+    +'<table><thead><tr><th>Código</th><th>Líder</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>Ofrenda</th><th>Estado</th><th>D/Z</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +'</body></html>';
+}
+function imprimirCuadre(){ abrirVentanaImpresion(_buildCuadreHTML()); }
+function descargarCuadrePDF(){
+  if(!_cuadreData){toast('Carga el cuadre primero','wa');return;}
+  loading(true);
+  try{
+    html2pdf().set({margin:[6,6,6,6],filename:'Cuadre_Dominical.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,letterRendering:true},jsPDF:{unit:'mm',format:'letter',orientation:'landscape'}}).from(_buildCuadreHTML()).save().then(function(){loading(false);toast('PDF generado','ok');}).catch(function(e){loading(false);toast('Error: '+e.message,'er');});
+  }catch(e){loading(false);toast('Error: '+e.message,'er');}
 }
 
 // ── CARGAR CONFIG EN PANTALLA DE LOGIN ANTES DE INGRESAR ──
