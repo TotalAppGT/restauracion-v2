@@ -39,8 +39,8 @@ def _zkey(d, z):
     """Clave normalizada (distrito, zona) para agrupar."""
     return (str(d or "").strip(), str(z or "").strip())
 
-def _informe_xlsx_base64(filas, distritos, total, meta, sys_nom, tipo, fecha_txt, trimestre, semana, pastor_principal):
-    """Genera el XLSX del informe semanal con bordes y estilos (openpyxl) y lo devuelve en base64."""
+def _informe_xlsx_base64(bloques, total, meta, sys_nom, tipo, fecha_txt, trimestre, semana, pastor_principal):
+    """Genera el XLSX del informe semanal agrupado por distrito (zonas + subtotal) con bordes y estilos."""
     import io
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
@@ -90,20 +90,24 @@ def _informe_xlsx_base64(filas, distritos, total, meta, sys_nom, tipo, fecha_txt
         setv(7, 3 + i, h, bold=True, align=center, fill=header_fill)
 
     r = 8
-    for f in filas:
-        setv(r, 1, f["zona"], align=center)
-        setv(r, 2, f["pastor"], align=left_al)
-        for i, c in enumerate(COLS):
-            v = f[c]
-            if v == 0: v = None
-            setv(r, 3 + i, v, align=center, bold=(c == "total"))
+    for b in bloques:
+        pd_nom = b.get("pastor_distrito", "")
+        lbl = "DISTRITO " + str(b.get("distrito", "")) + (("   -   PASTOR: " + pd_nom) if pd_nom else "")
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=17)
+        setv(r, 1, lbl, bold=True, align=left_al, fill=sub_fill)
         r += 1
-
-    for dt in distritos:
-        setv(r, 1, "DISTRITO " + str(dt.get("distrito", "")), bold=True, align=left_al, fill=sub_fill)
-        setv(r, 2, dt.get("pastor_distrito", ""), bold=True, align=left_al, fill=sub_fill)
+        for f in b.get("zonas", []):
+            setv(r, 1, f["zona"], align=center)
+            setv(r, 2, f["pastor"], align=left_al)
+            for i, c in enumerate(COLS):
+                v = f[c]
+                if v == 0: v = None
+                setv(r, 3 + i, v, align=center, bold=(c == "total"))
+            r += 1
+        setv(r, 1, "DISTRITO " + str(b.get("distrito", "")), bold=True, align=left_al, fill=sub_fill)
+        setv(r, 2, "", fill=sub_fill)
         for i, c in enumerate(COLS):
-            v = dt[c]
+            v = b["subtotal"][c]
             if v == 0: v = None
             setv(r, 3 + i, v, bold=True, align=center, fill=sub_fill)
         r += 1
