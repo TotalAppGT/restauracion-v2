@@ -5859,7 +5859,7 @@ function renderCuadre(el){
   <div class="mod-acts">
     <button class="btn btn-sm" style="background:#6b7280;color:#fff" onclick="nav(reporteModPrevio||'reportes')"><i class="fas fa-arrow-left"></i> Volver</button>
     <button class="btn btn-pr btn-sm" onclick="cargarCuadreDominical()"><i class="fas fa-sync"></i> Actualizar</button>
-    <button class="btn btn-sm" style="background:#c0392b;color:#fff" onclick="verNoRealizados()"><i class="fas fa-user-times"></i> Grupos NO Realizados</button>
+    <button class="btn btn-sm" id="btnNoRealizados" style="background:#fff;color:#c0392b;border:1px solid #c0392b" onclick="toggleNoRealizados()"><i class="fas fa-user-times"></i> Grupos NO Realizados</button>
     <button class="btn btn-in btn-sm" onclick="exportCuadreExcel()"><i class="fas fa-file-excel"></i> Excel (filtrado)</button>
     <button class="btn btn-er btn-sm" onclick="descargarCuadrePDF()"><i class="fas fa-file-pdf"></i> PDF (filtrado)</button>
     <button class="btn btn-ol btn-sm" onclick="imprimirCuadre()"><i class="fas fa-print"></i> Imprimir</button>
@@ -5939,6 +5939,16 @@ var _cuadreData=null;
 var _cuadreFiltrado=[];
 var _cuadreFecha='';
 var _cuadreHasta='';
+var _cuadreSoloNoRealizados=false;
+function toggleNoRealizados(){
+  _cuadreSoloNoRealizados=!_cuadreSoloNoRealizados;
+  var b=document.getElementById('btnNoRealizados');
+  if(b){
+    if(_cuadreSoloNoRealizados){b.style.background='#c0392b';b.style.color='#fff';b.innerHTML='<i class="fas fa-user-times"></i> Grupos NO Realizados — ACTIVO';}
+    else{b.style.background='#fff';b.style.color='#c0392b';b.innerHTML='<i class="fas fa-user-times"></i> Grupos NO Realizados';}
+  }
+  filtrarCuadre();
+}
 function cargarCuadreDominical(){
   var fechaEl=document.getElementById('cuaFecha');
   var desdeEl=document.getElementById('cuaDesde');
@@ -6051,7 +6061,8 @@ function renderCuadreResumen(data){
     rows+='<tr style="background:#eef2f8;font-weight:800"><td style="text-align:left;padding:3px 6px">Distrito '+esc(dg.distrito)+'</td><td>'+dg.totalLideres+'</td><td>'+dg.entregaron+'</td><td>'+dg.pendienteEntrega+'</td><td>'+dg.pendientes+'</td><td>'+dg.asistencia+'</td><td>'+fmtQ(dg.ofrendaTotal)+'</td></tr>';
   });
   var tbl=ag.length?'<table style="width:100%;border-collapse:collapse;font-size:11px;margin-top:8px"><thead><tr style="background:#dbe7f3"><th style="text-align:left;padding:3px 6px">Subtotal por Distrito</th><th>Líderes</th><th>Realiz.</th><th>Pend.Ent.</th><th>No realiz.</th><th>AGF</th><th>Ofrenda</th></tr></thead><tbody>'+rows+'</tbody></table>':'';
-  el.innerHTML='<div style="display:flex;gap:8px;flex-wrap:wrap">'+cards+'</div>'+tbl;
+  var note=_cuadreSoloNoRealizados?'<div style="background:#fdecea;color:#c0392b;font-weight:800;padding:6px 10px;border-radius:6px;margin-bottom:8px"><i class="fas fa-user-times"></i> Mostrando SOLO grupos NO realizados (sin reporte) — puedes imprimir/PDF/Excel lo que ves abajo</div>':'';
+  el.innerHTML=note+'<div style="display:flex;gap:8px;flex-wrap:wrap">'+cards+'</div>'+tbl;
 }
 function filtrarCuadre(q){
   q=q||document.getElementById('cuaBuscar')?.value||'';
@@ -6065,6 +6076,7 @@ function filtrarCuadre(q){
   if(filtro==='entregaron')data=data.filter(function(r){return r.tieneReporte&&r.ofrendaRecibida;});
   else if(filtro==='pendienteEntrega')data=data.filter(function(r){return r.tieneReporte&&!r.ofrendaRecibida;});
   else if(filtro==='pendientes')data=data.filter(function(r){return !r.tieneReporte;});
+  if(_cuadreSoloNoRealizados)data=data.filter(function(r){return !r.tieneReporte;});
   _cuadreFiltrado=data;
   renderCuadreResumen(data);
   if(_mostrandoAgrupado){renderCuadreAgrupado(_agruparCuadre(data));}else{renderCuadreTable(data);}
@@ -6202,12 +6214,15 @@ function _buildCuadreHTML(){
     +'<table><thead><tr><th>Código</th><th>Líder</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>AGF</th><th>Ofrenda</th><th>Estado</th><th>D/Z</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +'</body></html>';
 }
-function imprimirCuadre(){ abrirVentanaImpresion(_buildCuadreHTML()); }
+function _cuadreReporteHTML(){ return _cuadreSoloNoRealizados?_buildNoRealizadosHTML():_buildCuadreHTML(); }
+function imprimirCuadre(){ abrirVentanaImpresion(_cuadreReporteHTML()); }
 function descargarCuadrePDF(){
   if(!_cuadreData){toast('Carga el cuadre primero','wa');return;}
   loading(true);
+  var orient=_cuadreSoloNoRealizados?'portrait':'landscape';
+  var fname=_cuadreSoloNoRealizados?'Grupos_No_Realizados.pdf':'Cuadre_Dominical.pdf';
   try{
-    html2pdf().set({margin:[6,6,6,6],filename:'Cuadre_Dominical.pdf',image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,letterRendering:true},jsPDF:{unit:'mm',format:'letter',orientation:'landscape'}}).from(_buildCuadreHTML()).save().then(function(){loading(false);toast('PDF generado','ok');}).catch(function(e){loading(false);toast('Error: '+e.message,'er');});
+    html2pdf().set({margin:[6,6,6,6],filename:fname,image:{type:'jpeg',quality:0.98},html2canvas:{scale:2,useCORS:true,letterRendering:true},jsPDF:{unit:'mm',format:'letter',orientation:orient}}).from(_cuadreReporteHTML()).save().then(function(){loading(false);toast('PDF generado','ok');}).catch(function(e){loading(false);toast('Error: '+e.message,'er');});
   }catch(e){loading(false);toast('Error: '+e.message,'er');}
 }
 
@@ -6249,7 +6264,7 @@ function verNoRealizados(){
   openModal('Grupos NO Realizados — '+_cuadreSemanaTxt(), body, foot, 'lg');
 }
 function _buildNoRealizadosHTML(){
-  var data=_cuadreNoRealizados||[];
+  var data=_cuadreFiltrado||[];
   var ag=_agruparCuadre(data);
   var sysName=(APP.config&&APP.config.nombre)||'Iglesia Restauracion';
   var gen=new Date().toLocaleString('es-GT');
