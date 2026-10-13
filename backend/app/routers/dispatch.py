@@ -58,8 +58,8 @@ def _informe_xlsx_base64(bloques, total, meta, sys_nom, tipo, fecha_txt, trimest
     sub_fill = PatternFill("solid", fgColor="EDF2FA")
     total_fill = PatternFill("solid", fgColor="FCE4D6")
 
-    HDR1 = ["INICIO","NUEVO","CERRADO","CUBIERTO","TOTAL","HECHOS","NO HECHOS","ADULTOS","NIÑOS","CONV. GRU.","CONV. IGLE","VISITAS P.","BAUTIZADOS","REC. GRU.","REC. IGLE."]
-    COLS = ["inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"]
+    HDR1 = ["INICIO","NUEVO","CERRADO","CUBIERTO","TOTAL","HECHOS","NO HECHOS","ADULTOS","NIÑOS","CONV. GRU.","CONV. IGLE","VISITAS P.","BAUTIZADOS","REC. GRU.","REC. IGLE.","OFRENDA"]
+    COLS = ["inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle","ofrenda"]
 
     def setv(r, c, v, bold=False, align=None, fill=None, bd=True):
         cell = ws.cell(row=r, column=c, value=v)
@@ -70,18 +70,19 @@ def _informe_xlsx_base64(bloques, total, meta, sys_nom, tipo, fecha_txt, trimest
         return cell
 
     # Bloque de título (sin bordes)
-    ws.merge_cells("A1:O1"); setv(1, 1, (sys_nom or "IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL").upper(), bold=True, align=center, bd=False)
+    ws.merge_cells("A1:R1"); setv(1, 1, (sys_nom or "IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL").upper(), bold=True, align=center, bd=False)
     setv(1, 16, "TRIMESTRE", bold=True, align=center, bd=False); setv(1, 17, trimestre, bold=True, align=center, bd=False)
-    ws.merge_cells("A2:O2"); setv(2, 1, tipo, bold=True, align=center, bd=False)
+    ws.merge_cells("A2:R2"); setv(2, 1, tipo, bold=True, align=center, bd=False)
     setv(3, 1, "FECHA", bold=True, align=left_al, bd=False)
     setv(3, 16, "SEMANA", bold=True, align=center, bd=False); setv(3, 17, semana, bold=True, align=center, bd=False)
-    ws.merge_cells("A4:O4"); setv(4, 1, fecha_txt, align=center, bd=False)
+    ws.merge_cells("A4:R4"); setv(4, 1, fecha_txt, align=center, bd=False)
 
     # Encabezados de grupo (fila 6)
     setv(6, 1, "", bd=False); setv(6, 2, "", bd=False)
     ws.merge_cells("C6:I6"); setv(6, 3, "INFORME DE GRUPOS", bold=True, align=center)
     ws.merge_cells("J6:K6"); setv(6, 10, "ASISTENCIA", bold=True, align=center)
     ws.merge_cells("L6:Q6"); setv(6, 12, "FRUTOS", bold=True, align=center)
+    setv(6, 18, "OFRENDA", bold=True, align=center)
 
     # Sub-encabezados (fila 7)
     setv(7, 1, "ZONA", bold=True, align=center, fill=header_fill)
@@ -93,7 +94,7 @@ def _informe_xlsx_base64(bloques, total, meta, sys_nom, tipo, fecha_txt, trimest
     for b in bloques:
         pd_nom = b.get("pastor_distrito", "")
         lbl = "DISTRITO " + str(b.get("distrito", "")) + (("   -   PASTOR: " + pd_nom) if pd_nom else "")
-        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=17)
+        ws.merge_cells(start_row=r, start_column=1, end_row=r, end_column=18)
         setv(r, 1, lbl, bold=True, align=left_al, fill=sub_fill)
         r += 1
         for f in b.get("zonas", []):
@@ -154,7 +155,7 @@ def _informe_xlsx_base64(bloques, total, meta, sys_nom, tipo, fecha_txt, trimest
 
     ws.column_dimensions["A"].width = 9
     ws.column_dimensions["B"].width = 24
-    for col in range(3, 18):
+    for col in range(3, 19):
         ws.column_dimensions[get_column_letter(col)].width = 10
 
     buf = io.BytesIO()
@@ -2045,7 +2046,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             meta_total = meta_adultos + meta_ninos
 
             def zkey(d, z): return (str(d or "").strip(), str(z or "").strip())
-            def zblank(): return {"inicio": 0, "nuevo_set": set(), "hechos": set(), "adultos": 0, "ninos": 0,
+            def zblank(): return {"inicio": 0, "nuevo_set": set(), "hechos": set(), "adultos": 0, "ninos": 0, "ofrenda": 0.0,
                                   "conv_gru": 0, "conv_igle": 0, "visitas": 0, "bautizados": 0, "rec_gru": 0, "rec_igle": 0,
                                   "pastor_zona": ""}
 
@@ -2102,6 +2103,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     if ck not in codigos_antes: zz["nuevo_set"].add(ck)
                 zz["adultos"] += (r.hnos or 0) + (r.amigos or 0)
                 zz["ninos"] += (r.ninos or 0)
+                zz["ofrenda"] += float(r.ofrenda_total or 0)
                 if r.lider: lider_nombre_a_zona.setdefault(str(r.lider).strip().upper(), k)
 
             # Seguimientos del periodo -> FRUTOS por zona (responsable -> zona)
@@ -2125,7 +2127,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 return sorted(items, key=lambda k: (int(k[0]) if k[0].isdigit() else 99999, k[0], int(k[1]) if k[1].isdigit() else 99999, k[1]))
 
             # Construir estructura agrupada por distrito (zonas + subtotal)
-            FIELDS = ("inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle")
+            FIELDS = ("inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle","ofrenda")
             dist_zonas = {}
             for (d, z) in zsort(list(zonas.keys())):
                 zz = zonas[(d, z)]
@@ -2135,7 +2137,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         "hechos": hechos, "no_hechos": hechos - total,
                         "adultos": zz["adultos"], "ninos": zz["ninos"],
                         "conv_gru": zz["conv_gru"], "conv_igle": zz["conv_igle"], "visitas": zz["visitas"],
-                        "bautizados": zz["bautizados"], "rec_gru": zz["rec_gru"], "rec_igle": zz["rec_igle"]}
+                        "bautizados": zz["bautizados"], "rec_gru": zz["rec_gru"], "rec_igle": zz["rec_igle"],
+                        "ofrenda": round(zz["ofrenda"], 2)}
                 dist_zonas.setdefault(d, []).append(fila)
             bloques = []
             tg = {f: 0 for f in FIELDS}
@@ -2169,8 +2172,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             fecha_gen = datetime.now().strftime('%d/%m/%Y %I:%M %p')
 
             # ── HTML (PDF) con la estructura exacta ──
-            COLS = ["inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle"]
-            HDR1 = ["INICIO","NUEVO","CERRADO","CUBIERTO","TOTAL","HECHOS","NO HECHOS","ADULTOS","NIÑOS","CONV. GRU.","CONV. IGLE","VISITAS P.","BAUTIZADOS","REC. GRU.","REC. IGLE."]
+            COLS = ["inicio","nuevo","cerrado","cubierto","total","hechos","no_hechos","adultos","ninos","conv_gru","conv_igle","visitas","bautizados","rec_gru","rec_igle","ofrenda"]
+            HDR1 = ["INICIO","NUEVO","CERRADO","CUBIERTO","TOTAL","HECHOS","NO HECHOS","ADULTOS","NIÑOS","CONV. GRU.","CONV. IGLE","VISITAS P.","BAUTIZADOS","REC. GRU.","REC. IGLE.","OFRENDA"]
             def cell(v, bold=False, num=True):
                 if v == 0: s = ""
                 elif isinstance(v, float): s = f"{v:,.1f}"
@@ -2181,7 +2184,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             for b in bloques:
                 pd_nom = b["pastor_distrito"]
                 hdr = f'DISTRITO {esc(b["distrito"])}' + (f' &nbsp;·&nbsp; PASTOR DE DISTRITO: {esc(pd_nom)}' if pd_nom else '')
-                body.append(f'<tr><td colspan="17" style="background:#1a3a5c;color:#fff;font-weight:800;font-size:11px;padding:5px 8px;border:1px solid #b9c2d0">{hdr}</td></tr>')
+                body.append(f'<tr><td colspan="18" style="background:#1a3a5c;color:#fff;font-weight:800;font-size:11px;padding:5px 8px;border:1px solid #b9c2d0">{hdr}</td></tr>')
                 for f in b["zonas"]:
                     tds = [f'<td style="padding:3px 5px;text-align:center;font-size:10px;border:1px solid #b9c2d0">{esc(f["zona"])}</td>',
                            f'<td style="padding:3px 5px;text-align:left;font-size:10px;border:1px solid #b9c2d0">{esc(f["pastor"])}</td>']
@@ -2214,7 +2217,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             </div>
             <table style="margin-top:10px">
               <thead>
-              <tr><th colspan="2" style="border:1px solid #b9c2d0;font-size:10px">ZONA</th><th colspan="7" style="border:1px solid #b9c2d0;font-size:10px">INFORME DE GRUPOS</th><th colspan="2" style="border:1px solid #b9c2d0;font-size:10px">ASISTENCIA</th><th colspan="6" style="border:1px solid #b9c2d0;font-size:10px">FRUTOS</th></tr>
+              <tr><th colspan="2" style="border:1px solid #b9c2d0;font-size:10px">ZONA</th><th colspan="7" style="border:1px solid #b9c2d0;font-size:10px">INFORME DE GRUPOS</th><th colspan="2" style="border:1px solid #b9c2d0;font-size:10px">ASISTENCIA</th><th colspan="6" style="border:1px solid #b9c2d0;font-size:10px">FRUTOS</th><th colspan="1" style="border:1px solid #b9c2d0;font-size:10px">OFRENDA</th></tr>
               <tr><th style="border:1px solid #b9c2d0;font-size:9px"></th><th style="border:1px solid #b9c2d0;font-size:9px">PASTOR DE ZONA</th>{''.join(f'<th style="border:1px solid #b9c2d0;font-size:8px">{h}</th>' for h in HDR1)}</tr>
               </thead>
               <tbody>{body_html}</tbody>
