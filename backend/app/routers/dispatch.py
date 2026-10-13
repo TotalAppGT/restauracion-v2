@@ -654,12 +654,30 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             digitales = reportes_filtrados.filter(Reporte.reporte_origen == "Digital").count()
             manuales = reportes_filtrados.count() - digitales
             
-            # Asistencia por distrito
-            asist_distrito = []
-            distritos_rows = db.query(Reporte.distrito, func.sum(Reporte.asistencia)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).group_by(Reporte.distrito).all()
-            for d, a in distritos_rows:
-                if d: asist_distrito.append({"distrito": str(d), "asistencia": int(a or 0)})
-            
+            # Mapa codigo -> hermano (para resolver distrito de reportes sin distrito)
+            herm_by_cod = {}
+            for h in db.query(Hermano).all():
+                if h.codigo_lead: herm_by_cod[str(h.codigo_lead).strip()] = h
+            # Agregados por distrito (resolviendo distrito desde el lider)
+            dist_agg = {}
+            ofrenda_recibida = 0.0; ofrenda_pendiente = 0.0
+            codigos_rep = set()
+            for r in reportes_filtrados.all():
+                h = herm_by_cod.get(str(r.codigo or "").strip())
+                dd = str(r.distrito or (h.distrito if h else "") or "").strip()
+                if r.codigo: codigos_rep.add(str(r.codigo))
+                if str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None):
+                    ofrenda_pendiente += float(r.ofrenda_total or 0)
+                else:
+                    ofrenda_recibida += float(r.ofrenda_total or 0)
+                if not dd: continue
+                a = dist_agg.setdefault(dd, {"distrito": dd, "asistencia": 0, "grupos": 0, "ofrenda": 0.0})
+                a["asistencia"] += int(r.asistencia or 0)
+                a["grupos"] += 1
+                a["ofrenda"] += float(r.ofrenda_total or 0)
+            asist_distrito = sorted([{"distrito": v["distrito"], "asistencia": v["asistencia"], "grupos": v["grupos"], "ofrenda": round(v["ofrenda"], 2)} for v in dist_agg.values()], key=lambda x: (int(x["distrito"]) if x["distrito"].isdigit() else 99999))
+            no_realizados = max(lideres - len(codigos_rep), 0)
+
             # Hermanos por distrito
             hnos_distrito = []
             hd_rows = db.query(Hermano.distrito, func.count(Hermano.id)).filter(Hermano.codigo_lead != None).group_by(Hermano.distrito).all()
@@ -694,7 +712,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             ultimos = reportes_filtrados.order_by(Reporte.fecha.desc(), Reporte.id.desc()).limit(10).all()
             recientes = [{"Lider": r.lider, "Fecha": str(r.fecha), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Tipo de Reporte": r.tipo_reporte or "", "Reporte": r.reporte_origen or ""} for r in ultimos]
             
-            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "asistencia": asistencia_total, "ofTotal": of_total, "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados, "recientes": recientes}
+            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "noRealizados": no_realizados, "asistencia": asistencia_total, "ofTotal": of_total, "ofrendaRecibida": round(ofrenda_recibida,2), "ofrendaPendiente": round(ofrenda_pendiente,2), "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados, "recientes": recientes}
 
         # ── HERMANOS (returns RAW ARRAY, matching GAS) ──
         if action == "getHermanos":
@@ -800,6 +818,28 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 obj = Reporte(**data)
                 db.add(obj)
             db.commit()
+            # Crear seguimientos (FRUTOS) a partir del reporte: convertidos, reconciliados, visitas, bautizos...
+            try:
+                lider_nom = str(data.get("lider") or payload.get("Lider") or "").strip()
+                f = data.get("fecha")
+                if isinstance(f, str):
+                    try: f = datetime.strptime(f, "%Y-%m-%d").date()
+                    except: f = None
+                for i in range(1, 11):
+                    nk = "Nombre Persona" if i == 1 else f"Nombre Persona {i}"
+                    tk = "Tipo de Seguimiento" if i == 1 else f"Tipo de Seguimiento {i}"
+                    nom = str(payload.get(nk, "") or "").strip()
+                    if not nom: continue
+                    tipo = str(payload.get(tk, "") or "Otro").strip() or "Otro"
+                    existe = db.query(Seguimiento).filter(
+                        Seguimiento.persona == nom, Seguimiento.fecha == f, Seguimiento.responsable == lider_nom
+                    ).first()
+                    if not existe:
+                        db.add(Seguimiento(fecha=f, persona=nom, tipo=tipo, responsable=lider_nom,
+                                           estado="En Proceso", observaciones=f"Auto-registrado desde Reporte · {lider_nom}"))
+                db.commit()
+            except Exception as e:
+                print(f"seg reporte: {e}")
             return {"ok": True}
 
         if action == "deleteReporte":

@@ -123,7 +123,14 @@ input,select,textarea{font-family:var(--fn);outline:none}
 .sc-l{font-size:9px;font-weight:700;color:var(--tx2);margin-top:3px;text-transform:uppercase;letter-spacing:.5px}
 
 /* TABLE */
-.tw{overflow-x:auto;border-radius:var(--r2)}
+.tw{overflow-x:auto;border-radius:var(--r2);max-width:100%;-webkit-overflow-scrolling:touch}
+.tw::-webkit-scrollbar{height:12px}
+.tw::-webkit-scrollbar-track{background:#eef2f8;border-radius:8px}
+.tw::-webkit-scrollbar-thumb{background:#9fb0c8;border-radius:8px}
+.tw::-webkit-scrollbar-thumb:hover{background:#7d8fa8}
+.tw table td:last-child,.tw table th:last-child{position:sticky;right:0;z-index:2;box-shadow:-4px 0 6px -4px rgba(0,0,0,.14)}
+.tw table tbody td:last-child{background:var(--bg2)}
+.tw table thead th:last-child{background:var(--pr)}
 table{width:100%;border-collapse:collapse;font-size:13px;white-space:nowrap}
 thead th{background:var(--pr);color:#fff;padding:9px 12px;text-align:left;font-weight:700;font-size:11px;position:sticky;top:0;z-index:1}
 thead th:first-child{border-radius:var(--r2) 0 0 0}thead th:last-child{border-radius:0 var(--r2) 0 0}

@@ -785,15 +785,17 @@ function buildDashKPIs(d){
   if(titleMeta)titleMeta.innerHTML='<i class="fas fa-home"></i> Grupos Realizados vs Meta ('+metaG+') <button class="btn btn-ol btn-sm" style="margin-left:auto;font-size:10px;padding:3px 8px" onclick="imprimirGrafica(\'chGrupos\',\'Grupos vs Meta\')"><i class="fas fa-print"></i></button>';
   sg.innerHTML=[
     {l:'Líderes',v:d.lideres,i:'fa-user-tie',c:''},
-    {l:'Grupos '+({hoy:'Hoy',semana:'Semana',mes:'Mes',trimestre:'Trim.'}[document.getElementById('dashRango')?.value||'mes']),v:d.reportesMes,i:'fa-home',c:'o'},
+    {l:'Grupos realizados',v:d.reportesMes,i:'fa-home',c:'o'},
+    {l:'Grupos NO realizados',v:(d.noRealizados||0),i:'fa-user-times',c:'r'},
     {l:'Meta: '+metaG,v:pct+'%',i:'fa-bullseye',c:pct>=100?'g':'t'},
-    {l:'Asistencia',v:d.asistencia,i:'fa-users',c:'g'},
-    {l:'Ofrenda',v:fmtQ(d.ofTotal),i:'fa-hand-holding-usd',c:'p'},
+    {l:'Asistencia (AGF)',v:d.asistencia,i:'fa-users',c:'g'},
+    {l:'Ofrenda recibida',v:fmtQ(d.ofrendaRecibida!=null?d.ofrendaRecibida:d.ofTotal),i:'fa-hand-holding-usd',c:'g'},
+    {l:'Ofrenda pendiente',v:fmtQ(d.ofrendaPendiente||0),i:'fa-hourglass-half',c:'t'},
+    {l:'Ofrenda total',v:fmtQ(d.ofTotal),i:'fa-coins',c:'p'},
     {l:'Convertidos',v:d.convertidos||0,i:'fa-heart',c:'i'},
     {l:'Reconciliados',v:d.reconciliados||0,i:'fa-handshake',c:'t'},
     {l:'Seguimientos',v:d.segTotal||0,i:'fa-tasks',c:'p'},
     {l:'Pendientes',v:d.pendientes||0,i:'fa-exclamation-triangle',c:'r'},
-    {l:'Cronogramas',v:(d.proxCron||[]).length,i:'fa-calendar-alt',c:'t'},
   ].map(s=>`<div class="sc ${s.c}"><div class="sc-ico"><i class="fas ${s.i}"></i></div><div class="sc-v">${s.v}</div><div class="sc-l">${s.l}</div></div>`).join('');
 }
 function buildDashCharts(d){
@@ -5871,24 +5873,24 @@ function renderCuadre(el){
         <h3 style="font-size:15px;font-weight:900;margin-bottom:4px">Cierre Semanal de Reportes</h3>
         <p style="opacity:.85;font-size:12px;margin-bottom:6px">Cada domingo a las 12:00 AM se cierra la semana. Aquí ves qué líderes entregaron su reporte y quiénes están pendientes.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:8px">
-          <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:100px">
-            <div style="font-size:24px;font-weight:900" id="cuaTotal">0</div>
+          <div style="background:rgba(255,255,255,.15);border-radius:8px;padding:8px 12px;text-align:center;flex:1 1 120px;min-width:120px;overflow:hidden">
+            <div style="font-size:20px;font-weight:900;line-height:1.15;overflow-wrap:anywhere" id="cuaTotal">0</div>
             <div style="font-size:10px;opacity:.8">Total Líderes</div>
           </div>
-          <div style="background:rgba(39,174,96,.2);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:100px">
-            <div style="font-size:24px;font-weight:900" id="cuaEntregaron">0</div>
+          <div style="background:rgba(39,174,96,.2);border-radius:8px;padding:8px 12px;text-align:center;flex:1 1 120px;min-width:120px;overflow:hidden">
+            <div style="font-size:20px;font-weight:900;line-height:1.15;overflow-wrap:anywhere" id="cuaEntregaron">0</div>
             <div style="font-size:10px;opacity:.8">✓ Ofrenda Recibida</div>
           </div>
-          <div style="background:rgba(232,160,32,.2);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:100px">
-            <div style="font-size:24px;font-weight:900" id="cuaPendienteEntrega">0</div>
+          <div style="background:rgba(232,160,32,.2);border-radius:8px;padding:8px 12px;text-align:center;flex:1 1 120px;min-width:120px;overflow:hidden">
+            <div style="font-size:20px;font-weight:900;line-height:1.15;overflow-wrap:anywhere" id="cuaPendienteEntrega">0</div>
             <div style="font-size:10px;opacity:.8">📝 Pend. Entrega</div>
           </div>
-          <div style="background:rgba(231,76,60,.2);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:100px">
-            <div style="font-size:24px;font-weight:900" id="cuaPendientes">0</div>
+          <div style="background:rgba(231,76,60,.2);border-radius:8px;padding:8px 12px;text-align:center;flex:1 1 120px;min-width:120px;overflow:hidden">
+            <div style="font-size:20px;font-weight:900;line-height:1.15;overflow-wrap:anywhere" id="cuaPendientes">0</div>
             <div style="font-size:10px;opacity:.8">⏳ Sin Reporte</div>
           </div>
-          <div style="background:rgba(232,160,32,.2);border-radius:8px;padding:8px 14px;text-align:center;flex:1;min-width:100px">
-            <div style="font-size:24px;font-weight:900" id="cuaOfrenda">Q 0.00</div>
+          <div style="background:rgba(232,160,32,.2);border-radius:8px;padding:8px 12px;text-align:center;flex:1 1 120px;min-width:120px;overflow:hidden">
+            <div style="font-size:20px;font-weight:900;line-height:1.15;overflow-wrap:anywhere" id="cuaOfrenda">Q 0.00</div>
             <div style="font-size:10px;opacity:.8">Ofrenda Total</div>
           </div>
         </div>
