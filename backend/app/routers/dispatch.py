@@ -783,11 +783,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if not item_id:
                 data.pop("id", None)
             data = {k: v for k, v in data.items() if not (isinstance(v, str) and v.strip() == "")}
-            # Logica de ofrenda: Digital -> Pendiente, Fisico/Manual -> Recibida
+            # Logica de ofrenda: Digital -> Pendiente; cualquier ingreso desde el
+            # sistema (manual/fisico) -> Fisico y Recibida
             origen = str(data.get("reporte_origen", "") or "").strip().lower()
             if origen == "digital":
                 data["ofrenda_recibida"] = "Pendiente"
-            elif origen in ("fisico", "físico", "manual", ""):
+            else:
+                data["reporte_origen"] = "Fisico"
                 data["ofrenda_recibida"] = "Recibida"
             if item_id:
                 obj = db.query(Reporte).filter(Reporte.id == int(item_id)).first()
@@ -1285,9 +1287,32 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 except:
                     reportes_q = reportes_q.filter(Reporte.fecha == fecha)
             reportes = reportes_q.all()
+            # Rango efectivo de fechas (para seguimientos/frutos)
+            _ini = None; _fin = None
+            if desde or hasta:
+                try:
+                    if desde: _ini = datetime.strptime(desde, "%Y-%m-%d").date()
+                    if hasta: _fin = datetime.strptime(hasta, "%Y-%m-%d").date()
+                except: pass
+            elif fecha:
+                try:
+                    _d = datetime.strptime(fecha, "%Y-%m-%d").date(); _ini = _d - timedelta(days=_d.weekday()); _fin = _ini + timedelta(days=6)
+                except: pass
+            # Frutos = seguimientos por responsable (lider) en el periodo
+            frutos_map = {}
+            try:
+                sq = db.query(Seguimiento)
+                if _ini: sq = sq.filter(Seguimiento.fecha >= _ini)
+                if _fin: sq = sq.filter(Seguimiento.fecha <= _fin)
+                for s in sq.all():
+                    rk = (s.responsable or "").strip().upper()
+                    if rk: frutos_map[rk] = frutos_map.get(rk, 0) + 1
+            except Exception:
+                pass
             codigos_reportados = set(r.codigo for r in reportes)
             data, total_lideres, entregaron, pendientes_c, ofrenda_total = [], 0, 0, 0, 0.0
             total_asistencia = 0
+            total_frutos = 0
             pendiente_entrega = 0  # digital enviado pero ofrenda no entregada
             # Agrupar por distrito
             distritos = {}
@@ -1297,8 +1322,12 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 rpts = [r for r in reportes if r.codigo == h.codigo_lead]
                 ofrenda = sum(float(r.ofrenda_total or 0) for r in rpts)
                 asist = sum(int(r.asistencia or 0) for r in rpts)
-                # ofrenda recibida solo si algun reporte tiene estado Recibida
-                recibida = any(r.ofrenda_recibida not in ("Pendiente", "", None) for r in rpts)
+                # ofrenda recibida: un reporte digital pendiente cuenta como "pendiente entrega";
+                # cualquier reporte fisico/manual cuenta como recibido (todo el ingreso es fisico)
+                recibida = reporto and not any(
+                    str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None)
+                    for r in rpts
+                )
                 ofrenda_recibida_val = sum(float(r.ofrenda_total or 0) for r in rpts if r.ofrenda_recibida not in ("Pendiente", "", None))
                 if not reporto:
                     pendientes_c += 1  # sin reporte (grupo NO realizado)
@@ -1308,26 +1337,34 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     entregaron += 1  # ofrenda recibida
                 ofrenda_total += ofrenda
                 total_asistencia += asist
+                frutos = frutos_map.get((h.nombre or "").strip().upper(), 0)
+                total_frutos += frutos
                 d = str(h.distrito or "?")
                 z = str(h.zona or "?")
-                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": recibida, "asistencia": asist, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
+                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": recibida, "asistencia": asist, "frutos": frutos, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
                 data.append(item)
-                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "asistencia": 0, "zonas": {}}
+                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "asistencia": 0, "frutos": 0, "zonas": {}}
                 distritos[d]["totalLideres"] += 1
                 if not reporto: distritos[d]["pendientes"] += 1
                 elif not recibida: distritos[d]["pendienteEntrega"] += 1
                 else: distritos[d]["entregaron"] += 1
                 distritos[d]["ofrendaTotal"] += ofrenda
                 distritos[d]["asistencia"] += asist
-                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "asistencia": 0, "lideres": []}
+                distritos[d]["frutos"] += frutos
+                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "asistencia": 0, "frutos": 0, "lideres": []}
                 distritos[d]["zonas"][z]["totalLideres"] += 1
                 if not reporto: distritos[d]["zonas"][z]["pendientes"] += 1
                 elif not recibida: distritos[d]["zonas"][z]["pendienteEntrega"] += 1
                 else: distritos[d]["zonas"][z]["entregaron"] += 1
                 distritos[d]["zonas"][z]["ofrendaTotal"] += ofrenda
                 distritos[d]["zonas"][z]["asistencia"] += asist
+                distritos[d]["zonas"][z]["frutos"] += frutos
                 distritos[d]["zonas"][z]["lideres"].append(item)
             # Convertir zonas de dict a lista ordenada
+            pd_map = {}
+            for pd_ in db.query(PastorDistrito).all():
+                if pd_.nombre_pastor_distrito:
+                    pd_map[str(pd_.distrito or "").strip()] = str(pd_.nombre_pastor_distrito).strip()
             distritos_list = []
             for dk in sorted(distritos.keys()):
                 dg = distritos[dk]
@@ -1338,9 +1375,10 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     zonas_list.append(zg)
                 dg["zonas"] = zonas_list
                 dg["ofrendaTotal"] = round(dg["ofrendaTotal"], 2)
+                dg["pastorDistrito"] = pd_map.get(str(dk).strip(), "")
                 distritos_list.append(dg)
             generar_pdf = payload.get("generarPDF", False)
-            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "gruposRealizados": entregaron + pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2), "asistenciaTotal": total_asistencia}
+            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "gruposRealizados": entregaron + pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2), "asistenciaTotal": total_asistencia, "frutosTotal": total_frutos}
             if generar_pdf:
                 try:
                     from fpdf import FPDF
