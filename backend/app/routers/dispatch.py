@@ -70,12 +70,12 @@ def _informe_xlsx_base64(bloques, total, meta, sys_nom, tipo, fecha_txt, trimest
         return cell
 
     # Bloque de título (sin bordes)
-    ws.merge_cells("A1:R1"); setv(1, 1, (sys_nom or "IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL").upper(), bold=True, align=center, bd=False)
+    ws.merge_cells("A1:O1"); setv(1, 1, (sys_nom or "IGLESIAS DE RESTAURACIÓN MISIÓN INTERNACIONAL").upper(), bold=True, align=center, bd=False)
     setv(1, 16, "TRIMESTRE", bold=True, align=center, bd=False); setv(1, 17, trimestre, bold=True, align=center, bd=False)
-    ws.merge_cells("A2:R2"); setv(2, 1, tipo, bold=True, align=center, bd=False)
+    ws.merge_cells("A2:O2"); setv(2, 1, tipo, bold=True, align=center, bd=False)
     setv(3, 1, "FECHA", bold=True, align=left_al, bd=False)
     setv(3, 16, "SEMANA", bold=True, align=center, bd=False); setv(3, 17, semana, bold=True, align=center, bd=False)
-    ws.merge_cells("A4:R4"); setv(4, 1, fecha_txt, align=center, bd=False)
+    ws.merge_cells("A4:O4"); setv(4, 1, fecha_txt, align=center, bd=False)
 
     # Encabezados de grupo (fila 6)
     setv(6, 1, "", bd=False); setv(6, 2, "", bd=False)
