@@ -649,6 +649,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             seg_enproceso = segs_q.filter(Seguimiento.estado.ilike("%proceso%")).count()
             seg_completados = segs_q.filter(Seguimiento.estado.ilike("%complet%")).count()
             seg_cancelados = segs_q.filter(Seguimiento.estado.ilike("%cancel%")).count()
+            # Frutos por tipo (seguimientos)
+            frutos_tipo = {
+                "convertidos": segs_q.filter(Seguimiento.tipo == "Convertido").count(),
+                "reconciliados": segs_q.filter(Seguimiento.tipo.ilike("%reconcil%")).count(),
+                "visitas": segs_q.filter(Seguimiento.tipo.ilike("%visita%")).count(),
+                "bautizados": segs_q.filter(Seguimiento.tipo.ilike("%bautiz%")).count(),
+            }
             
             # Digital vs Manual
             digitales = reportes_filtrados.filter(Reporte.reporte_origen == "Digital").count()
@@ -683,6 +690,21 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             hd_rows = db.query(Hermano.distrito, func.count(Hermano.id)).filter(Hermano.codigo_lead != None).group_by(Hermano.distrito).all()
             for d, c in hd_rows:
                 if d: hnos_distrito.append({"distrito": str(d), "total": c})
+
+            # Grupos realizados vs NO realizados por distrito
+            lideres_dist = {}
+            for h in db.query(Hermano).filter(Hermano.codigo_lead != None).all():
+                dd = str(h.distrito or "").strip()
+                if dd: lideres_dist[dd] = lideres_dist.get(dd, 0) + 1
+            realizados_dist = {}
+            for r in reportes_filtrados.all():
+                h = herm_by_cod.get(str(r.codigo or "").strip())
+                dd = str(r.distrito or (h.distrito if h else "") or "").strip()
+                if dd and r.codigo: realizados_dist.setdefault(dd, set()).add(str(r.codigo))
+            grupos_distrito = []
+            for dd in sorted(lideres_dist.keys(), key=lambda x: (int(x) if x.isdigit() else 99999)):
+                tot = lideres_dist[dd]; real = len(realizados_dist.get(dd, set()))
+                grupos_distrito.append({"distrito": dd, "realizados": real, "no_realizados": max(tot - real, 0), "total": tot})
             
             # Grafica mensual (ultimos 6 meses)
             grafica = []
@@ -712,7 +734,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             ultimos = reportes_filtrados.order_by(Reporte.fecha.desc(), Reporte.id.desc()).limit(10).all()
             recientes = [{"Lider": r.lider, "Fecha": str(r.fecha), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Tipo de Reporte": r.tipo_reporte or "", "Reporte": r.reporte_origen or ""} for r in ultimos]
             
-            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "noRealizados": no_realizados, "asistencia": asistencia_total, "ofTotal": of_total, "ofrendaRecibida": round(ofrenda_recibida,2), "ofrendaPendiente": round(ofrenda_pendiente,2), "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados, "recientes": recientes}
+            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "noRealizados": no_realizados, "asistencia": asistencia_total, "ofTotal": of_total, "ofrendaRecibida": round(ofrenda_recibida,2), "ofrendaPendiente": round(ofrenda_pendiente,2), "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados, "recientes": recientes, "frutosTipo": frutos_tipo, "gruposDistrito": grupos_distrito}
 
         # ── HERMANOS (returns RAW ARRAY, matching GAS) ──
         if action == "getHermanos":

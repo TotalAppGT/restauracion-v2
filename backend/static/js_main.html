@@ -729,6 +729,10 @@ function renderDashboard(el){
     <div class="dc" id="dc_tipo"><div class="dct dct-i"><i class="fas fa-mobile-alt"></i> Digital vs Manual</div><div class="chart-area"><canvas id="chTipo"></canvas></div></div>
     <div class="dc" id="dc_distAsist"><div class="dct dct-o"><i class="fas fa-map-marker-alt"></i> Asistencia por Distrito</div><div class="chart-area"><canvas id="chDistAsist"></canvas></div></div>
   </div>
+  <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px;margin-bottom:14px" id="dashRow3">
+    <div class="dc" id="dc_frutos"><div class="dct dct-p"><i class="fas fa-seedling"></i> Frutos por tipo (seguimientos)</div><div class="chart-area"><canvas id="chFrutos"></canvas></div></div>
+    <div class="dc" id="dc_distGrupos"><div class="dct dct-g"><i class="fas fa-layer-group"></i> Grupos realizados vs NO realizados por Distrito</div><div class="chart-area"><canvas id="chDistGrupos"></canvas></div></div>
+  </div>
   <div class="dg" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px">
     <div class="dc"><div class="dct dct-p"><i class="fas fa-clock"></i> Ultimos Reportes</div><div id="dashRec" style="max-height:200px;overflow-y:auto"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
     <div class="dc"><div class="dct dct-i"><i class="fas fa-hands-helping"></i> Ultimos Seguimientos</div><div id="dashSeg" style="max-height:200px;overflow-y:auto"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i></div></div></div>
@@ -803,7 +807,7 @@ function buildDashCharts(d){
   const labels=g.map(x=>x.mes);
   const col1='#6366f1',col2='#f59e0b',col3='#10b981',col4='#8b5cf6',col5='#ef4444',col6='#06b6d4',col7='#ec4899',col8='#84cc16';
   const colsReu=['#6366f1','#f59e0b','#10b981','#ec4899','#06b6d4'];
-  ['chAsist','chGrupos','chConv','chTipo','chSeg','chDistAsist','chDistHnos','chReuniones'].forEach(id=>{
+  ['chAsist','chGrupos','chConv','chTipo','chSeg','chDistAsist','chDistHnos','chReuniones','chFrutos','chDistGrupos'].forEach(id=>{
     if(APP.charts[id]){APP.charts[id].destroy();delete APP.charts[id];}
   });
   // Helper: datalabels plugin config
@@ -873,6 +877,24 @@ function buildDashCharts(d){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:9},boxWidth:10}}},scales:{x:{stacked:false,grid:{display:false}},y:{stacked:false,beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}},}},plugins:[dlBar]});
   } else if(c8){
     c8.parentElement.innerHTML='<div style="text-align:center;padding:16px;color:var(--tx3);font-size:13px"><i class="fas fa-church" style="font-size:24px;margin-bottom:8px;display:block"></i>Sin datos de reuniones</div>';
+  }
+  // 9. Frutos por tipo (seguimientos)
+  const c9=document.getElementById('chFrutos');
+  if(c9){
+    var ft=d.frutosTipo||{};
+    var ftData=[ft.convertidos||0,ft.reconciliados||0,ft.visitas||0,ft.bautizados||0];
+    APP.charts.chFrutos=new Chart(c9,{type:'bar',data:{labels:['Convertidos','Reconciliados','Visitas','Bautizados'],datasets:[{data:ftData,backgroundColor:['#10b981','#8b5cf6','#06b6d4','#f59e0b'],borderRadius:5}]},options:dashOpts(),plugins:[dlBar]});
+  }
+  // 10. Grupos realizados vs NO realizados por Distrito
+  const c10=document.getElementById('chDistGrupos');
+  var gd=d.gruposDistrito||[];
+  if(c10&&gd.length){
+    APP.charts.chDistGrupos=new Chart(c10,{type:'bar',data:{labels:gd.map(function(x){return 'D'+x.distrito;}),datasets:[
+      {label:'Realizados',data:gd.map(function(x){return x.realizados;}),backgroundColor:'#10b981',borderRadius:4},
+      {label:'NO realizados',data:gd.map(function(x){return x.no_realizados;}),backgroundColor:'#ef4444',borderRadius:4},
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom',labels:{font:{size:10},boxWidth:12}}},scales:{x:{stacked:true,grid:{display:false}},y:{stacked:true,beginAtZero:true,grid:{color:'rgba(0,0,0,.04)'}}}},plugins:[dlBar]});
+  } else if(c10){
+    c10.parentElement.innerHTML='<div style="text-align:center;padding:16px;color:var(--tx3);font-size:13px"><i class="fas fa-layer-group" style="font-size:24px;margin-bottom:8px;display:block"></i>Sin datos</div>';
   }
 }
 function dashOpts(y1id,y2id){
