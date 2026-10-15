@@ -4322,11 +4322,12 @@ function renderConfiguracion(el){
   <!-- INFORME SEMANAL -->
   <div class="cfg-section">
     <div class="cfg-section-title"><i class="fas fa-file-alt"></i> Informe Semanal de Grupos Familiares</div>
-    <p style="font-size:13px;color:var(--tx2);margin-bottom:12px">Datos para el módulo <b>Informe Detallado</b> (meta de asistencia y pastor principal).</p>
+    <p style="font-size:13px;color:var(--tx2);margin-bottom:12px">Datos para el módulo <b>Informe Detallado</b> (meta de asistencia y pastor principal) y meta de ofrenda por grupo.</p>
     <div class="fg2">
       <div class="fgg"><label>Pastor Principal</label><input class="fc" id="cfgPastorPrincipal" value="${esc(cfg.pastor_principal||'PASTOR NELSON')}" placeholder="PASTOR NELSON"></div>
       <div class="fgg"><label>Meta Asistencia — Adultos</label><input class="fc" type="number" min="0" id="cfgMetaAdultos" value="${esc(cfg.meta_asistencia_adultos||'1950')}" placeholder="1950"></div>
       <div class="fgg"><label>Meta Asistencia — Niños</label><input class="fc" type="number" min="0" id="cfgMetaNinos" value="${esc(cfg.meta_asistencia_ninos||'820')}" placeholder="820"></div>
+      <div class="fgg"><label>Meta de Ofrenda por Grupo (Q)</label><input class="fc" type="number" min="0" step="0.01" id="cfgMetaOfrendaGrupo" value="${esc(cfg.meta_ofrenda_grupo||'15')}" placeholder="15"></div>
     </div>
   </div>
 
@@ -4864,6 +4865,7 @@ function guardarConfig(){
     pastor_principal:g('cfgPastorPrincipal')||'PASTOR NELSON',
     meta_asistencia_adultos:g('cfgMetaAdultos')||'1950',
     meta_asistencia_ninos:g('cfgMetaNinos')||'820',
+    meta_ofrenda_grupo:g('cfgMetaOfrendaGrupo')||'15',
     logo_url:localStorage.getItem(LOGO_KEY)||'',
     gemini_api_key:g('cfgGeminiKey')||'',
     openrouter_api_key:g('cfgOpenrouterKey')||'',
@@ -5952,6 +5954,13 @@ function renderCuadre(el){
       <thead><tr><th>#</th><th>Código</th><th>Líder</th><th>D</th><th>Z</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>AGF</th><th>Frutos</th><th>Ofrenda</th><th>Estado</th></tr></thead>
       <tbody id="cuaTb"></tbody>
     </table></div>
+  </div>
+  <div class="card" style="margin-top:14px;padding:0">
+    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span><i class="fas fa-bullseye"></i> Meta de Ofrenda por Pastor de Zona (<b>Q <span id="cuaMetaGrupo">15</span></b> por grupo)</span><span style="font-size:11px;color:var(--tx2)">Meta = grupos × Q15 · Actual = ofrenda recibida · Avance = Actual − Meta</span></div>
+    <div class="tw"><table>
+      <thead><tr><th>Distrito</th><th>Pastor de Zona</th><th>Grupos</th><th>META (Q)</th><th>ACTUAL (Q)</th><th>AVANCE (Q)</th></tr></thead>
+      <tbody id="cuaMetaTb"></tbody>
+    </table></div>
   </div>`;
   var fe=document.getElementById('cuaFecha');
   if(fe)fe.value=today();
@@ -5963,6 +5972,7 @@ var _cuadreFiltrado=[];
 var _cuadreFecha='';
 var _cuadreHasta='';
 var _cuadreSoloNoRealizados=false;
+var _cuadreMetaTotals=null;
 function toggleNoRealizados(){
   _cuadreSoloNoRealizados=!_cuadreSoloNoRealizados;
   var b=document.getElementById('btnNoRealizados');
@@ -5986,6 +5996,9 @@ function cargarCuadreDominical(){
     if(!res||!res.ok){toast('Error al cargar cuadre','er');return;}
     _cuadreData=res.data||[];
     _cuadreAgrupado=res.agrupado||[];
+    _cuadreMetaTotals={meta:res.meta||0,actual:res.actual||0,avance:res.avance||0,metaGrupo:res.metaOfrendaGrupo||15};
+    var mgEl=document.getElementById('cuaMetaGrupo');if(mgEl)mgEl.textContent=(res.metaOfrendaGrupo||15);
+    renderCuadreMeta();
     // Poblar selects de Distrito y Zona
     var distSel=document.getElementById('cuaDist'), zonaSel=document.getElementById('cuaZona');
     if(distSel){var ds=[...new Set((_cuadreData||[]).map(function(r){return (r.distrito||'').trim();}).filter(Boolean))].sort(function(a,b){return (parseInt(a)||999)-(parseInt(b)||999);});var curD=distSel.value;distSel.innerHTML='<option value="">Distrito: Todos</option>'+ds.map(function(d){return '<option value="'+esc(d)+'">Distrito '+esc(d)+'</option>';}).join('');distSel.value=curD;}
@@ -6089,6 +6102,26 @@ function renderCuadreResumen(data){
   var note=_cuadreSoloNoRealizados?'<div style="background:#fdecea;color:#c0392b;font-weight:800;padding:6px 10px;border-radius:6px;margin-bottom:8px"><i class="fas fa-user-times"></i> Mostrando SOLO grupos NO realizados (sin reporte) — puedes imprimir/PDF/Excel lo que ves abajo</div>':'';
   el.innerHTML=note+'<div style="display:flex;gap:8px;flex-wrap:wrap">'+cards+'</div>'+tbl;
 }
+function renderCuadreMeta(){
+  var tb=document.getElementById('cuaMetaTb');if(!tb)return;
+  var fDist=(document.getElementById('cuaDist')||{}).value||'';
+  var fZona=(document.getElementById('cuaZona')||{}).value||'';
+  var ag=_cuadreAgrupado||[];
+  var rows='';var gGru=0,gMeta=0,gAct=0,gAva=0;
+  ag.forEach(function(dg){
+    if(fDist&&String(dg.distrito)!==fDist)return;
+    (dg.zonas||[]).forEach(function(zg){
+      if(fZona&&String(zg.zona)!==fZona)return;
+      var meta=Number(zg.meta||0),act=Number(zg.actual||0),ava=Number(zg.avance||0);
+      gGru+=Number(zg.totalLideres||0);gMeta+=meta;gAct+=act;gAva+=ava;
+      var col=ava>=0?'color:#059669;':'color:#dc2626;';
+      rows+='<tr><td>'+esc(dg.distrito)+'</td><td><b>'+esc(zg.pastor||('Zona '+zg.zona))+'</b></td><td>'+zg.totalLideres+'</td><td>'+fmtQ(meta)+'</td><td>'+fmtQ(act)+'</td><td style="font-weight:800;'+col+'">'+fmtQ(ava)+'</td></tr>';
+    });
+  });
+  var tcol=gAva>=0?'color:#059669;':'color:#dc2626;';
+  rows+='<tr style="background:#dbe7f3;font-weight:900"><td colspan="2" style="text-align:right">TOTAL GENERAL</td><td>'+gGru+'</td><td>'+fmtQ(gMeta)+'</td><td>'+fmtQ(gAct)+'</td><td style="'+tcol+'">'+fmtQ(gAva)+'</td></tr>';
+  tb.innerHTML=rows;
+}
 function filtrarCuadre(q){
   q=q||document.getElementById('cuaBuscar')?.value||'';
   var filtro=document.getElementById('cuaFiltro')?.value||'';
@@ -6104,6 +6137,7 @@ function filtrarCuadre(q){
   if(_cuadreSoloNoRealizados)data=data.filter(function(r){return !r.tieneReporte;});
   _cuadreFiltrado=data;
   renderCuadreResumen(data);
+  renderCuadreMeta();
   if(_mostrandoAgrupado){renderCuadreAgrupado(_agruparCuadre(data));}else{renderCuadreTable(data);}
 }
 // ── AUTO-REFRESH ──────────────────────────────────────────
@@ -6183,7 +6217,41 @@ function exportCuadreExcel(){
     rows.push({'Distrito':'SUBTOTAL DISTRITO '+dg.distrito,'Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':dg.entregaron+' realiz.','AGF':dg.asistencia,'Frutos':dg.frutos,'Ofrenda Q':Number(dg.ofrendaTotal),'Estado':''});
   });
   rows.push({'Distrito':'TOTAL GENERAL','Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':(t.ent+t.pe)+' realiz.','AGF':t.asis,'Frutos':t.fru,'Ofrenda Q':Number(t.ofr),'Estado':''});
+  // Sección META por Pastor de Zona
+  var fDistM=(document.getElementById('cuaDist')||{}).value||'';
+  var fZonaM=(document.getElementById('cuaZona')||{}).value||'';
+  rows.push({'Distrito':'','Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':'','META (Q)':'','ACTUAL (Q)':'','AVANCE (Q)':''});
+  rows.push({'Distrito':'META POR PASTOR DE ZONA (Q'+((_cuadreMetaTotals&&_cuadreMetaTotals.metaGrupo)||15)+' por grupo)','Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':'','META (Q)':'','ACTUAL (Q)':'','AVANCE (Q)':''});
+  var gGru=0,gMeta=0,gAct=0,gAva=0;
+  (_cuadreAgrupado||[]).forEach(function(dg){
+    if(fDistM&&String(dg.distrito)!==fDistM)return;
+    (dg.zonas||[]).forEach(function(zg){
+      if(fZonaM&&String(zg.zona)!==fZonaM)return;
+      var m=Number(zg.meta||0),a=Number(zg.actual||0),av=Number(zg.avance||0);
+      gGru+=Number(zg.totalLideres||0);gMeta+=m;gAct+=a;gAva+=av;
+      rows.push({'Distrito':dg.distrito,'Zona':'','Código':'','Líder':'','Pastor Zona':zg.pastor||('Zona '+zg.zona),'Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':zg.totalLideres,'META (Q)':Number(m),'ACTUAL (Q)':Number(a),'AVANCE (Q)':Number(av)});
+    });
+  });
+  rows.push({'Distrito':'','Zona':'','Código':'','Líder':'','Pastor Zona':'TOTAL GENERAL','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':gGru,'META (Q)':Number(gMeta),'ACTUAL (Q)':Number(gAct),'AVANCE (Q)':Number(gAva)});
   exportXLS(rows,'Cuadre Dominical','cuadre_dominical');
+}
+function _cuadreMetaHTML(){
+  var fDist=(document.getElementById('cuaDist')||{}).value||'';
+  var fZona=(document.getElementById('cuaZona')||{}).value||'';
+  var ag=_cuadreAgrupado||[];
+  var rows='';var gGru=0,gMeta=0,gAct=0,gAva=0;
+  ag.forEach(function(dg){
+    if(fDist&&String(dg.distrito)!==fDist)return;
+    (dg.zonas||[]).forEach(function(zg){
+      if(fZona&&String(zg.zona)!==fZona)return;
+      var m=Number(zg.meta||0),a=Number(zg.actual||0),av=Number(zg.avance||0);
+      gGru+=Number(zg.totalLideres||0);gMeta+=m;gAct+=a;gAva+=av;
+      rows+='<tr><td>'+esc(dg.distrito)+'</td><td>'+esc(zg.pastor||('Zona '+zg.zona))+'</td><td>'+zg.totalLideres+'</td><td style="text-align:right">'+fmtQ(m)+'</td><td style="text-align:right">'+fmtQ(a)+'</td><td style="text-align:right;font-weight:800;'+(av>=0?'color:#059669':'color:#dc2626')+'">'+fmtQ(av)+'</td></tr>';
+    });
+  });
+  rows+='<tr style="background:#dbe7f3;font-weight:900"><td colspan="2" style="text-align:right">TOTAL GENERAL</td><td>'+gGru+'</td><td style="text-align:right">'+fmtQ(gMeta)+'</td><td style="text-align:right">'+fmtQ(gAct)+'</td><td style="text-align:right;'+(gAva>=0?'color:#059669':'color:#dc2626')+'">'+fmtQ(gAva)+'</td></tr>';
+  return '<h3 style="font-size:11px;font-weight:800;color:#1a3a5c;margin-top:14px">META DE OFRENDA POR PASTOR DE ZONA (Q'+((_cuadreMetaTotals&&_cuadreMetaTotals.metaGrupo)||15)+' por grupo)</h3>'
+    +'<table><thead><tr><th>Distrito</th><th>Pastor de Zona</th><th>Grupos</th><th>META (Q)</th><th>ACTUAL (Q)</th><th>AVANCE (Q)</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 function _cuadreSemanaTxt(){
   var fl=function(x){return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')+'/'+x.getFullYear();};
@@ -6248,6 +6316,7 @@ function _buildCuadreHTML(){
     +'<div class="sub" style="font-size:10px;margin-top:3px">Filtros: '+esc(_cuadreFiltrosTexto())+' &nbsp;|&nbsp; Generado: '+gen+'</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'+kpi+'</div>'
     +'<table><thead><tr><th>Código</th><th>Líder</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>AGF</th><th>Frutos</th><th>Ofrenda</th><th>Estado</th></tr></thead><tbody>'+rows+'</tbody></table>'
+    +_cuadreMetaHTML()
     +'</body></html>';
 }
 function _cuadreReporteHTML(){ return _cuadreSoloNoRealizados?_buildNoRealizadosHTML():_buildCuadreHTML(); }

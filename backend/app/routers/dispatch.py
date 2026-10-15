@@ -254,6 +254,60 @@ def _get_church_name(db):
     except: pass
     return "Iglesia Restauracion"
 
+def _meta_ofrenda_grupo(db):
+    """Meta de ofrenda por grupo (Q) — escalable. Default Q15.00 por grupo."""
+    try:
+        from app.models import Configuracion
+        c = db.query(Configuracion).filter(Configuracion.clave == "meta_ofrenda_grupo").first()
+        if c and c.valor:
+            v = float(c.valor)
+            if v > 0: return v
+    except: pass
+    return 15.0
+
+def _meta_por_pastor_zona(db, desde, hasta):
+    """Meta de ofrenda por pastor de zona (Q X grupo). Devuelve (filas, total, meta_of)."""
+    meta_of = _meta_ofrenda_grupo(db)
+    zonas = {}
+    for h in db.query(Hermano).filter(Hermano.codigo_lead != None).all():
+        d = str(h.distrito or "").strip(); z = str(h.zona or "").strip()
+        if not d and not z: continue
+        k = (d, z)
+        if k not in zonas: zonas[k] = {"distrito": d, "zona": z, "pastor": str(h.pastor_zona or "").strip(), "grupos": 0, "actual": 0.0}
+        zonas[k]["grupos"] += 1
+    for p in db.query(Pastore).all():
+        k = (str(p.distrito or "").strip(), str(p.zona or "").strip())
+        if k in zonas and p.nombre_pastor:
+            zonas[k]["pastor"] = str(p.nombre_pastor).strip()
+    herm_by_cod = {str(h.codigo_lead).strip(): h for h in db.query(Hermano).all() if h.codigo_lead}
+    q = db.query(Reporte)
+    if desde:
+        try: q = q.filter(Reporte.fecha >= datetime.strptime(desde, "%Y-%m-%d").date())
+        except: pass
+    if hasta:
+        try: q = q.filter(Reporte.fecha <= datetime.strptime(hasta, "%Y-%m-%d").date())
+        except: pass
+    for r in q.all():
+        h = herm_by_cod.get(str(r.codigo or "").strip())
+        d = str(r.distrito or (h.distrito if h else "") or "").strip()
+        z = str(r.zona or (h.zona if h else "") or "").strip()
+        k = (d, z)
+        if k not in zonas: continue
+        if str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None):
+            continue
+        zonas[k]["actual"] += float(r.ofrenda_total or 0)
+    filas = []
+    total = {"grupos": 0, "meta": 0.0, "actual": 0.0, "avance": 0.0}
+    for k in sorted(zonas.keys(), key=lambda x: (int(x[0]) if x[0].isdigit() else 99999, x[0], int(x[1]) if x[1].isdigit() else 99999, x[1])):
+        zz = zonas[k]
+        zz["meta"] = round(zz["grupos"] * meta_of, 2)
+        zz["actual"] = round(zz["actual"], 2)
+        zz["avance"] = round(zz["actual"] - zz["meta"], 2)
+        total["grupos"] += zz["grupos"]; total["meta"] += zz["meta"]; total["actual"] += zz["actual"]; total["avance"] += zz["avance"]
+        filas.append(zz)
+    total["meta"] = round(total["meta"], 2); total["actual"] = round(total["actual"], 2); total["avance"] = round(total["avance"], 2)
+    return filas, total, meta_of
+
 def _get_system_url(db=None):
     """Obtiene la URL del sistema desde config o env, con fallback."""
     try:
@@ -987,7 +1041,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             menuConfig = {}
             for m in ALL_MENU_IDS:
                 menuConfig[m] = configs.get(f"menu_mod_{m}", "SI") != "NO"
-            return {"ok": True, "ssId": configs.get("ssId",""), "nombre": configs.get("nombre","REDIL"), "formUrl": configs.get("formUrl",""), "formUrlPublic": configs.get("formUrlPublic",f"{_get_system_url()}/form"), "activo": True, "logo_url": configs.get("logo_url","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "logoUrl": configs.get("logoUrl","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "menuConfig": menuConfig, "ownerEmail": configs.get("ownerEmail","totalappgt@gmail.com"), "inactividadMinutos": int(configs.get("inactividadMinutos","60")), "metaGrupos": configs.get("metaGrupos","407"), "pastor_principal": configs.get("pastor_principal","PASTOR NELSON"), "meta_asistencia_adultos": configs.get("meta_asistencia_adultos","1950"), "meta_asistencia_ninos": configs.get("meta_asistencia_ninos","820"), "driveFolderId": configs.get("driveFolderId","1OHBSDIk7e1FOyC1tgkkAJoRb_nJh2CKM"), "botPdfFolderId": configs.get("botPdfFolderId",""), "pdf_id": configs.get("pdf_id",""), "gemini_api_key": configs.get("gemini_api_key",""), "openrouter_api_key": configs.get("openrouter_api_key",""), "deepseek_api_key": configs.get("deepseek_api_key",""), "telegram_token": configs.get("telegram_token", os.getenv("TELEGRAM_TOKEN", "")), "telegram_chat_id": configs.get("telegram_chat_id", os.getenv("TELEGRAM_CHAT_ID", "")),
+            return {"ok": True, "ssId": configs.get("ssId",""), "nombre": configs.get("nombre","REDIL"), "formUrl": configs.get("formUrl",""), "formUrlPublic": configs.get("formUrlPublic",f"{_get_system_url()}/form"), "activo": True, "logo_url": configs.get("logo_url","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "logoUrl": configs.get("logoUrl","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "menuConfig": menuConfig, "ownerEmail": configs.get("ownerEmail","totalappgt@gmail.com"), "inactividadMinutos": int(configs.get("inactividadMinutos","60")), "metaGrupos": configs.get("metaGrupos","407"), "pastor_principal": configs.get("pastor_principal","PASTOR NELSON"), "meta_asistencia_adultos": configs.get("meta_asistencia_adultos","1950"), "meta_asistencia_ninos": configs.get("meta_asistencia_ninos","820"), "meta_ofrenda_grupo": configs.get("meta_ofrenda_grupo","15"), "driveFolderId": configs.get("driveFolderId","1OHBSDIk7e1FOyC1tgkkAJoRb_nJh2CKM"), "botPdfFolderId": configs.get("botPdfFolderId",""), "pdf_id": configs.get("pdf_id",""), "gemini_api_key": configs.get("gemini_api_key",""), "openrouter_api_key": configs.get("openrouter_api_key",""), "deepseek_api_key": configs.get("deepseek_api_key",""), "telegram_token": configs.get("telegram_token", os.getenv("TELEGRAM_TOKEN", "")), "telegram_chat_id": configs.get("telegram_chat_id", os.getenv("TELEGRAM_CHAT_ID", "")),
             "firebaseApiKey": configs.get("firebaseApiKey", os.getenv("FIREBASE_API_KEY", "")),
             "firebaseAuthDomain": configs.get("firebaseAuthDomain", os.getenv("FIREBASE_AUTH_DOMAIN", "totalappgt-d15b9.firebaseapp.com")),
             "firebaseProjectId": configs.get("firebaseProjectId", os.getenv("FIREBASE_PROJECT_ID", "totalappgt-d15b9")),
@@ -1376,6 +1430,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             data, total_lideres, entregaron, pendientes_c, ofrenda_total = [], 0, 0, 0, 0.0
             total_asistencia = 0
             total_frutos = 0
+            total_ofrenda_recibida = 0.0
+            meta_ofrenda_grupo = _meta_ofrenda_grupo(db)
             pendiente_entrega = 0  # digital enviado pero ofrenda no entregada
             # Agrupar por distrito
             distritos = {}
@@ -1392,6 +1448,10 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     for r in rpts
                 )
                 ofrenda_recibida_val = sum(float(r.ofrenda_total or 0) for r in rpts if r.ofrenda_recibida not in ("Pendiente", "", None))
+                # Monto realmente recibido (fisico/manual = recibido; solo digital-pendiente no cuenta)
+                ofrenda_rec = sum(float(r.ofrenda_total or 0) for r in rpts if not (
+                    str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None)
+                ))
                 if not reporto:
                     pendientes_c += 1  # sin reporte (grupo NO realizado)
                 elif not recibida:
@@ -1400,34 +1460,38 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     entregaron += 1  # ofrenda recibida
                 ofrenda_total += ofrenda
                 total_asistencia += asist
+                total_ofrenda_recibida += ofrenda_rec
                 frutos = frutos_map.get((h.nombre or "").strip().upper(), 0)
                 total_frutos += frutos
                 d = str(h.distrito or "?")
                 z = str(h.zona or "?")
-                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": recibida, "asistencia": asist, "frutos": frutos, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
+                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": recibida, "ofrendaRecibidaAmt": round(ofrenda_rec, 2), "asistencia": asist, "frutos": frutos, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
                 data.append(item)
-                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "asistencia": 0, "frutos": 0, "zonas": {}}
+                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "ofrendaRecibida": 0.0, "asistencia": 0, "frutos": 0, "zonas": {}}
                 distritos[d]["totalLideres"] += 1
                 if not reporto: distritos[d]["pendientes"] += 1
                 elif not recibida: distritos[d]["pendienteEntrega"] += 1
                 else: distritos[d]["entregaron"] += 1
                 distritos[d]["ofrendaTotal"] += ofrenda
+                distritos[d]["ofrendaRecibida"] += ofrenda_rec
                 distritos[d]["asistencia"] += asist
                 distritos[d]["frutos"] += frutos
-                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "asistencia": 0, "frutos": 0, "lideres": []}
+                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "ofrendaRecibida": 0.0, "asistencia": 0, "frutos": 0, "lideres": []}
                 distritos[d]["zonas"][z]["totalLideres"] += 1
                 if not reporto: distritos[d]["zonas"][z]["pendientes"] += 1
                 elif not recibida: distritos[d]["zonas"][z]["pendienteEntrega"] += 1
                 else: distritos[d]["zonas"][z]["entregaron"] += 1
                 distritos[d]["zonas"][z]["ofrendaTotal"] += ofrenda
+                distritos[d]["zonas"][z]["ofrendaRecibida"] += ofrenda_rec
                 distritos[d]["zonas"][z]["asistencia"] += asist
                 distritos[d]["zonas"][z]["frutos"] += frutos
                 distritos[d]["zonas"][z]["lideres"].append(item)
-            # Convertir zonas de dict a lista ordenada
+            # Convertir zonas de dict a lista ordenada + meta/actual/avance
             pd_map = {}
             for pd_ in db.query(PastorDistrito).all():
                 if pd_.nombre_pastor_distrito:
                     pd_map[str(pd_.distrito or "").strip()] = str(pd_.nombre_pastor_distrito).strip()
+            total_meta = 0.0
             distritos_list = []
             for dk in sorted(distritos.keys()):
                 dg = distritos[dk]
@@ -1435,13 +1499,23 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 for zk in sorted(dg["zonas"].keys()):
                     zg = dg["zonas"][zk]
                     zg["ofrendaTotal"] = round(zg["ofrendaTotal"], 2)
+                    zg["ofrendaRecibida"] = round(zg["ofrendaRecibida"], 2)
+                    zg["meta"] = round(zg["totalLideres"] * meta_ofrenda_grupo, 2)
+                    zg["actual"] = zg["ofrendaRecibida"]
+                    zg["avance"] = round(zg["actual"] - zg["meta"], 2)
+                    zg["pastor"] = zg["lideres"][0]["pastorZona"] if zg["lideres"] else ""
                     zonas_list.append(zg)
                 dg["zonas"] = zonas_list
                 dg["ofrendaTotal"] = round(dg["ofrendaTotal"], 2)
+                dg["ofrendaRecibida"] = round(dg["ofrendaRecibida"], 2)
+                dg["meta"] = round(dg["totalLideres"] * meta_ofrenda_grupo, 2)
+                dg["actual"] = dg["ofrendaRecibida"]
+                dg["avance"] = round(dg["actual"] - dg["meta"], 2)
+                total_meta += dg["meta"]
                 dg["pastorDistrito"] = pd_map.get(str(dk).strip(), "")
                 distritos_list.append(dg)
             generar_pdf = payload.get("generarPDF", False)
-            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "gruposRealizados": entregaron + pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2), "asistenciaTotal": total_asistencia, "frutosTotal": total_frutos}
+            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "gruposRealizados": entregaron + pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2), "ofrendaRecibida": round(total_ofrenda_recibida, 2), "asistenciaTotal": total_asistencia, "frutosTotal": total_frutos, "metaOfrendaGrupo": meta_ofrenda_grupo, "meta": round(total_meta, 2), "actual": round(total_ofrenda_recibida, 2), "avance": round(total_ofrenda_recibida - total_meta, 2)}
             if generar_pdf:
                 try:
                     from fpdf import FPDF
@@ -2264,6 +2338,15 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             body.append('<tr>' + ''.join(tds) + '</tr>')
             body_html = ''.join(body)
 
+            # Meta de ofrenda por pastor de zona (Q X grupo)
+            meta_zonas, meta_zonas_total, meta_zonas_of = _meta_por_pastor_zona(db, desde, hasta)
+            _mz_rows = ""
+            for mz in meta_zonas:
+                col = "#059669" if mz["avance"] >= 0 else "#dc2626"
+                _mz_rows += f'<tr><td>{esc(mz["distrito"])}</td><td style="text-align:left">{esc(mz["pastor"] or ("Zona "+mz["zona"]))}</td><td>{mz["grupos"]}</td><td>Q{mz["meta"]:,.2f}</td><td>Q{mz["actual"]:,.2f}</td><td style="color:{col};font-weight:800">Q{mz["avance"]:,.2f}</td></tr>'
+            _mz_rows += f'<tr style="font-weight:900;background:#dbe7f3"><td colspan="2" style="text-align:right">TOTAL GENERAL</td><td>{meta_zonas_total["grupos"]}</td><td>Q{meta_zonas_total["meta"]:,.2f}</td><td>Q{meta_zonas_total["actual"]:,.2f}</td><td>Q{meta_zonas_total["avance"]:,.2f}</td></tr>'
+            meta_zonas_tabla = f'<h3 style="font-size:11px;font-weight:800;color:#1a3a5c;margin-top:14px">META DE OFRENDA POR PASTOR DE ZONA (Q{meta_zonas_of:g} por grupo) &mdash; META | ACTUAL | AVANCE</h3><table style="margin-top:6px"><thead><tr><th style="border:1px solid #b9c2d0">DISTRITO</th><th style="border:1px solid #b9c2d0">PASTOR DE ZONA</th><th style="border:1px solid #b9c2d0">GRUPOS</th><th style="border:1px solid #b9c2d0">META (Q)</th><th style="border:1px solid #b9c2d0">ACTUAL (Q)</th><th style="border:1px solid #b9c2d0">AVANCE (Q)</th></tr></thead><tbody>{_mz_rows}</tbody></table>'
+
             html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>{esc(sys_nom)} — {esc(tipo)}</title>
             <style>@page{{size:letter landscape;margin:0.35in}}body{{font-family:Arial,sans-serif;color:#111;margin:0}}
             table{{border-collapse:collapse;width:100%}}
@@ -2289,6 +2372,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
               <tr><td style="text-align:left;font-weight:800">{esc(pastor_principal)}</td><td colspan="3" style="text-align:left;font-weight:800">META ASISTENCIA</td><td>ADULTO</td><td>NIÑOS</td><td>TOTAL</td><td>ADULTOS</td><td>NIÑOS</td><td>TOTAL</td><td></td></tr>
               <tr><td style="text-align:left"></td><td>{meta_adultos}</td><td>{meta_ninos}</td><td>{meta_total}</td><td>{ant_adultos}</td><td>{ant_ninos}</td><td>{ant_total}</td><td>{pre_adultos}</td><td>{pre_ninos}</td><td>{pre_total}</td><td>{pct}%</td></tr>
             </table>
+            {meta_zonas_tabla}
             <div style="margin-top:12px;font-size:9px;color:#888;text-align:center">{esc(sys_nom)} · generado {fecha_gen}</div>
             </body></html>"""
 
@@ -2301,7 +2385,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             return {"ok": True, "html": html, "titulo": tipo, "fecha": fecha_txt, "trimestre": trimestre, "semana": semana,
                     "pastorPrincipal": pastor_principal, "xlsx_base64": xlsx_base64,
                     "meta": {"adultos": meta_adultos, "ninos": meta_ninos, "total": meta_total, "antAdultos": ant_adultos, "antNinos": ant_ninos, "antTotal": ant_total, "preAdultos": pre_adultos, "preNinos": pre_ninos, "preTotal": pre_total, "pct": pct},
-                    "filas": filas, "distritos": dist_list, "total": tg}
+                    "filas": filas, "distritos": dist_list, "total": tg,
+                    "metaZonas": meta_zonas, "metaZonasTotal": meta_zonas_total, "metaOfrendaGrupo": meta_zonas_of}
 
         # ── REPORTE AGRUPADO / DETALLADO (dinámico por dimensión) ──
         if action == "generarReporteAgrupado":
@@ -2476,6 +2561,15 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     <td>Q{d['ofrenda']:,.2f}</td>
                     <td><span class="{'pend' if d['estado']=='Pendiente' else 'ok'}">{d['estado']}</span></td></tr>"""
 
+            # Meta de ofrenda por pastor de zona (Q X grupo)
+            _mz_filas, _mz_total, _mz_of = _meta_por_pastor_zona(db, desde, hasta)
+            _mz_html = ""
+            for mz in _mz_filas:
+                col = "#059669" if mz["avance"] >= 0 else "#dc2626"
+                _mz_html += f'<tr><td>{esc(mz["distrito"])}</td><td style="text-align:left">{esc(mz["pastor"] or ("Zona "+mz["zona"]))}</td><td>{mz["grupos"]}</td><td>Q{mz["meta"]:,.2f}</td><td>Q{mz["actual"]:,.2f}</td><td style="color:{col};font-weight:800">Q{mz["avance"]:,.2f}</td></tr>'
+            _mz_html += f'<tr class="tot"><td colspan="2" style="text-align:left">TOTAL GENERAL</td><td>{_mz_total["grupos"]}</td><td>Q{_mz_total["meta"]:,.2f}</td><td>Q{_mz_total["actual"]:,.2f}</td><td>Q{_mz_total["avance"]:,.2f}</td></tr>'
+            _mz_tabla = f'<h3 class="sec">META DE OFRENDA POR PASTOR DE ZONA (Q{_mz_of:g} por grupo) &mdash; META | ACTUAL | AVANCE</h3><table><thead><tr><th style="text-align:left">DISTRITO</th><th style="text-align:left">PASTOR DE ZONA</th><th>GRUPOS</th><th>META (Q)</th><th>ACTUAL (Q)</th><th>AVANCE (Q)</th></tr></thead><tbody>{_mz_html}</tbody></table>'
+
             html = f"""<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8">
             <style>
             *{{margin:0;padding:0;box-sizing:border-box}}
@@ -2524,6 +2618,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
               <thead><tr><th style="text-align:left">{esc(agrupar_label)}</th><th>CÓDIGO</th><th style="text-align:left">LÍDER</th><th>FECHA</th><th>D</th><th>Z</th><th style="text-align:left">PASTOR ZONA</th><th style="text-align:left">SUP SECTOR</th><th>AGF</th><th>HNOS</th><th>AMG</th><th>NIÑOS</th><th>OFRENDA</th><th>ESTADO</th></tr></thead>
               <tbody>{rows_det}</tbody>
             </table>
+            {_mz_tabla}
             </body></html>"""
 
             xlsx_base64 = ""
@@ -2534,7 +2629,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
 
             return {"ok": True, "html": html, "xlsx_base64": xlsx_base64, "agrupar": agrupar,
                     "agrupar_label": agrupar_label, "grupos": grupos_ord, "total": total,
-                    "detalle": detalle, "fecha_txt": fecha_txt}
+                    "detalle": detalle, "fecha_txt": fecha_txt,
+                    "metaZonas": _mz_filas, "metaZonasTotal": _mz_total, "metaOfrendaGrupo": _mz_of}
 
         # ── WHATSAPP ──
         if action == "sendWhatsapp":
