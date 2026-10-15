@@ -5889,6 +5889,7 @@ function renderCuadre(el){
     <button class="btn btn-er btn-sm" onclick="descargarCuadrePDF()"><i class="fas fa-file-pdf"></i> PDF (filtrado)</button>
     <button class="btn btn-ol btn-sm" onclick="imprimirCuadre()"><i class="fas fa-print"></i> Imprimir</button>
     <button class="btn btn-ol btn-sm" id="btnAgruparCuadre" onclick="toggleAgruparCuadre()"><i class="fas fa-layer-group"></i> Agrupar por Distrito</button>
+    <label style="font-size:11px;display:flex;align-items:center;gap:4px;margin-left:auto;color:var(--tx2)"><input type="checkbox" id="cuaIncluirLideres" style="width:15px;height:15px"> Incluir listado de líderes en PDF/Imprimir</label>
   </div></div>
   <div class="card" style="background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:16px">
@@ -5950,16 +5951,16 @@ function renderCuadre(el){
       </select>
     </div>
     <div id="cuaResumen" style="padding:10px 16px;border-bottom:1px solid var(--brd);background:#f8fafd"></div>
+    <div style="padding:10px 16px;border-bottom:1px solid var(--brd)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;flex-wrap:wrap;gap:4px"><span><i class="fas fa-bullseye"></i> <b>Meta de Ofrenda por Pastor de Zona</b> (Q <span id="cuaMetaGrupo">15</span> por grupo)</span><span style="font-size:11px;color:var(--tx2)">Meta = grupos × Q15 · Actual = ofrenda recibida · Avance = Actual − Meta</span></div>
+      <div class="tw"><table>
+        <thead><tr><th>Distrito</th><th>Pastor de Zona</th><th>Grupos</th><th>META (Q)</th><th>ACTUAL (Q)</th><th>AVANCE (Q)</th></tr></thead>
+        <tbody id="cuaMetaTb"></tbody>
+      </table></div>
+    </div>
     <div class="tw"><table>
       <thead><tr><th>#</th><th>Código</th><th>Líder</th><th>D</th><th>Z</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>AGF</th><th>Frutos</th><th>Ofrenda</th><th>Estado</th></tr></thead>
       <tbody id="cuaTb"></tbody>
-    </table></div>
-  </div>
-  <div class="card" style="margin-top:14px;padding:0">
-    <div class="ct" style="display:flex;justify-content:space-between;align-items:center"><span><i class="fas fa-bullseye"></i> Meta de Ofrenda por Pastor de Zona (<b>Q <span id="cuaMetaGrupo">15</span></b> por grupo)</span><span style="font-size:11px;color:var(--tx2)">Meta = grupos × Q15 · Actual = ofrenda recibida · Avance = Actual − Meta</span></div>
-    <div class="tw"><table>
-      <thead><tr><th>Distrito</th><th>Pastor de Zona</th><th>Grupos</th><th>META (Q)</th><th>ACTUAL (Q)</th><th>AVANCE (Q)</th></tr></thead>
-      <tbody id="cuaMetaTb"></tbody>
     </table></div>
   </div>`;
   var fe=document.getElementById('cuaFecha');
@@ -6242,16 +6243,21 @@ function _cuadreMetaHTML(){
   var rows='';var gGru=0,gMeta=0,gAct=0,gAva=0;
   ag.forEach(function(dg){
     if(fDist&&String(dg.distrito)!==fDist)return;
+    var dGru=0,dMeta=0,dAct=0,dAva=0,zr='';
     (dg.zonas||[]).forEach(function(zg){
       if(fZona&&String(zg.zona)!==fZona)return;
       var m=Number(zg.meta||0),a=Number(zg.actual||0),av=Number(zg.avance||0);
-      gGru+=Number(zg.totalLideres||0);gMeta+=m;gAct+=a;gAva+=av;
-      rows+='<tr><td>'+esc(dg.distrito)+'</td><td>'+esc(zg.pastor||('Zona '+zg.zona))+'</td><td>'+zg.totalLideres+'</td><td style="text-align:right">'+fmtQ(m)+'</td><td style="text-align:right">'+fmtQ(a)+'</td><td style="text-align:right;font-weight:800;'+(av>=0?'color:#059669':'color:#dc2626')+'">'+fmtQ(av)+'</td></tr>';
+      dGru+=Number(zg.totalLideres||0);dMeta+=m;dAct+=a;dAva+=av;
+      zr+='<tr><td style="text-align:left">'+esc(zg.pastor||('Zona '+zg.zona))+'</td><td>'+zg.totalLideres+'</td><td style="text-align:right">'+fmtQ(m)+'</td><td style="text-align:right">'+fmtQ(a)+'</td><td style="text-align:right;font-weight:800;'+(av>=0?'color:#059669':'color:#dc2626')+'">'+fmtQ(av)+'</td></tr>';
     });
+    if(!zr)return;
+    rows+='<tr style="background:#1a3a5c;color:#fff"><td colspan="5" style="text-align:left;font-weight:800;font-size:11px">DISTRITO '+esc(dg.distrito)+(dg.pastorDistrito?' &nbsp;·&nbsp; PASTOR DE DISTRITO: '+esc(dg.pastorDistrito):'')+'</td></tr>'+zr;
+    rows+='<tr style="background:#eef2f8;font-weight:800"><td style="text-align:left">Subtotal Distrito '+esc(dg.distrito)+'</td><td>'+dGru+'</td><td style="text-align:right">'+fmtQ(dMeta)+'</td><td style="text-align:right">'+fmtQ(dAct)+'</td><td style="text-align:right;'+(dAva>=0?'color:#059669':'color:#dc2626')+'">'+fmtQ(dAva)+'</td></tr>';
+    gGru+=dGru;gMeta+=dMeta;gAct+=dAct;gAva+=dAva;
   });
-  rows+='<tr style="background:#dbe7f3;font-weight:900"><td colspan="2" style="text-align:right">TOTAL GENERAL</td><td>'+gGru+'</td><td style="text-align:right">'+fmtQ(gMeta)+'</td><td style="text-align:right">'+fmtQ(gAct)+'</td><td style="text-align:right;'+(gAva>=0?'color:#059669':'color:#dc2626')+'">'+fmtQ(gAva)+'</td></tr>';
-  return '<h3 style="font-size:11px;font-weight:800;color:#1a3a5c;margin-top:14px">META DE OFRENDA POR PASTOR DE ZONA (Q'+((_cuadreMetaTotals&&_cuadreMetaTotals.metaGrupo)||15)+' por grupo)</h3>'
-    +'<table><thead><tr><th>Distrito</th><th>Pastor de Zona</th><th>Grupos</th><th>META (Q)</th><th>ACTUAL (Q)</th><th>AVANCE (Q)</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  rows+='<tr style="background:#dbe7f3;font-weight:900"><td style="text-align:left">TOTAL GENERAL</td><td>'+gGru+'</td><td style="text-align:right">'+fmtQ(gMeta)+'</td><td style="text-align:right">'+fmtQ(gAct)+'</td><td style="text-align:right;'+(gAva>=0?'color:#059669':'color:#dc2626')+'">'+fmtQ(gAva)+'</td></tr>';
+  return '<h3 style="font-size:12px;font-weight:800;color:#1a3a5c;margin-top:14px">META DE OFRENDA POR PASTOR DE ZONA (Q'+((_cuadreMetaTotals&&_cuadreMetaTotals.metaGrupo)||15)+' por grupo)</h3>'
+    +'<table><thead><tr><th>Pastor de Zona</th><th>Grupos</th><th>META (Q)</th><th>ACTUAL (Q)</th><th>AVANCE (Q)</th></tr></thead><tbody>'+rows+'</tbody></table>';
 }
 function _cuadreSemanaTxt(){
   var fl=function(x){return String(x.getDate()).padStart(2,'0')+'/'+String(x.getMonth()+1).padStart(2,'0')+'/'+x.getFullYear();};
@@ -6288,22 +6294,27 @@ function _buildCuadreHTML(){
   var t=_cuadreTotales(data);
   var sysName=(APP.config&&APP.config.nombre)||'Iglesia Restauracion';
   var gen=new Date().toLocaleString('es-GT');
-  var rows='';
-  ag.forEach(function(dg){
-    rows+='<tr style="background:#1a3a5c;color:#fff"><td colspan="9" style="padding:5px 8px;font-weight:800;font-size:11px">DISTRITO '+esc(dg.distrito)+(dg.pastorDistrito?' &nbsp;·&nbsp; PASTOR DE DISTRITO: '+esc(dg.pastorDistrito):'')+'</td></tr>';
-    dg.zonas.forEach(function(zg){
-      rows+='<tr style="background:#eef2f8;font-weight:800"><td colspan="9" style="padding:3px 8px">ZONA '+esc(zg.zona)+' &mdash; '+zg.entregaron+'/'+zg.totalLideres+' realizados · AGF '+zg.asistencia+' · Frutos '+zg.frutos+' · '+fmtQ(zg.ofrendaTotal)+'</td></tr>';
-      zg.lideres.forEach(function(r){
-        var est=r.tieneReporte?(r.ofrendaRecibida?'<span style="color:#059669;font-weight:700">Recibida</span>':'<span style="color:#c87f00;font-weight:700">Pend. entrega</span>'):'<span style="color:#dc2626;font-weight:700">NO realizado</span>';
-        rows+='<tr><td>'+esc(r.codigo||'')+'</td><td><b>'+esc(r.nombre||'')+'</b></td><td>'+esc(r.pastorZona||'')+'</td><td>'+esc(r.supSector||'')+'</td><td>'+(r.tieneReporte?'Sí':'No')+'</td><td>'+(r.asistencia||0)+'</td><td>'+(r.frutos||0)+'</td><td style="text-align:right">'+fmtQ(r.ofrendaTotal||0)+'</td><td>'+est+'</td></tr>';
-      });
-      rows+='<tr style="background:#f0f4fa;font-weight:800"><td colspan="5" style="text-align:right">Subtotal Zona '+esc(zg.zona)+'</td><td>'+zg.asistencia+'</td><td>'+zg.frutos+'</td><td style="text-align:right">'+fmtQ(zg.ofrendaTotal)+'</td><td>'+zg.entregaron+' realiz.</td></tr>';
-    });
-    rows+='<tr style="background:#dbe7f3;font-weight:900"><td colspan="5" style="text-align:right">SUBTOTAL DISTRITO '+esc(dg.distrito)+'</td><td>'+dg.asistencia+'</td><td>'+dg.frutos+'</td><td style="text-align:right">'+fmtQ(dg.ofrendaTotal)+'</td><td>'+dg.entregaron+' realiz.</td></tr>';
-  });
-  rows+='<tr style="background:#c9d9ee;font-weight:900"><td colspan="5" style="text-align:right">TOTAL GENERAL</td><td>'+t.asis+'</td><td>'+t.fru+'</td><td style="text-align:right">'+fmtQ(t.ofr)+'</td><td>'+t.n+' líderes</td></tr>';
+  var incluir=!!(document.getElementById('cuaIncluirLideres')&&document.getElementById('cuaIncluirLideres').checked);
   var kpi=[['Líderes',t.n],['Realizados',t.ent+t.pe],['NO realizados',t.sr],['Pend. entrega',t.pe],['Asistencia (AGF)',t.asis],['Frutos',t.fru],['Ofrenda recibida',fmtQ(t.rec)],['Ofrenda pendiente',fmtQ(t.pen)],['Ofrenda total',fmtQ(t.ofr)]]
     .map(function(k){return '<div style="background:#fff;border:1px solid #dbe3ef;border-radius:8px;padding:8px 12px;min-width:110px;flex:1;text-align:center"><div style="font-size:16px;font-weight:900;color:#1a3a5c">'+k[1]+'</div><div style="font-size:9px;color:#7f8c9b">'+k[0]+'</div></div>';}).join('');
+  var leaderTable='';
+  if(incluir){
+    var rows='';
+    ag.forEach(function(dg){
+      rows+='<tr style="background:#1a3a5c;color:#fff"><td colspan="9" style="padding:5px 8px;font-weight:800;font-size:11px">DISTRITO '+esc(dg.distrito)+(dg.pastorDistrito?' &nbsp;·&nbsp; PASTOR DE DISTRITO: '+esc(dg.pastorDistrito):'')+'</td></tr>';
+      dg.zonas.forEach(function(zg){
+        rows+='<tr style="background:#eef2f8;font-weight:800"><td colspan="9" style="padding:3px 8px">ZONA '+esc(zg.zona)+' &mdash; '+zg.entregaron+'/'+zg.totalLideres+' realizados · AGF '+zg.asistencia+' · Frutos '+zg.frutos+' · '+fmtQ(zg.ofrendaTotal)+'</td></tr>';
+        zg.lideres.forEach(function(r){
+          var est=r.tieneReporte?(r.ofrendaRecibida?'<span style="color:#059669;font-weight:700">Recibida</span>':'<span style="color:#c87f00;font-weight:700">Pend. entrega</span>'):'<span style="color:#dc2626;font-weight:700">NO realizado</span>';
+          rows+='<tr><td>'+esc(r.codigo||'')+'</td><td><b>'+esc(r.nombre||'')+'</b></td><td>'+esc(r.pastorZona||'')+'</td><td>'+esc(r.supSector||'')+'</td><td>'+(r.tieneReporte?'Sí':'No')+'</td><td>'+(r.asistencia||0)+'</td><td>'+(r.frutos||0)+'</td><td style="text-align:right">'+fmtQ(r.ofrendaTotal||0)+'</td><td>'+est+'</td></tr>';
+        });
+        rows+='<tr style="background:#f0f4fa;font-weight:800"><td colspan="5" style="text-align:right">Subtotal Zona '+esc(zg.zona)+'</td><td>'+zg.asistencia+'</td><td>'+zg.frutos+'</td><td style="text-align:right">'+fmtQ(zg.ofrendaTotal)+'</td><td>'+zg.entregaron+' realiz.</td></tr>';
+      });
+      rows+='<tr style="background:#dbe7f3;font-weight:900"><td colspan="5" style="text-align:right">SUBTOTAL DISTRITO '+esc(dg.distrito)+'</td><td>'+dg.asistencia+'</td><td>'+dg.frutos+'</td><td style="text-align:right">'+fmtQ(dg.ofrendaTotal)+'</td><td>'+dg.entregaron+' realiz.</td></tr>';
+    });
+    rows+='<tr style="background:#c9d9ee;font-weight:900"><td colspan="5" style="text-align:right">TOTAL GENERAL</td><td>'+t.asis+'</td><td>'+t.fru+'</td><td style="text-align:right">'+fmtQ(t.ofr)+'</td><td>'+t.n+' líderes</td></tr>';
+    leaderTable='<h3 style="font-size:12px;font-weight:800;color:#1a3a5c;margin-top:14px">DETALLE POR LÍDERES</h3><table><thead><tr><th>Código</th><th>Líder</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>AGF</th><th>Frutos</th><th>Ofrenda</th><th>Estado</th></tr></thead><tbody>'+rows+'</tbody></table>';
+  }
   return '<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><style>'
     +'@page{size:letter landscape;margin:0.4in}body{font-family:Arial,sans-serif;color:#1e293b;font-size:10px;margin:0}'
     +'.hdr{background:linear-gradient(135deg,#1a3a5c,#2563a8);color:#fff;padding:12px 16px}'
@@ -6315,8 +6326,8 @@ function _buildCuadreHTML(){
     +'<div class="hdr"><h1>'+esc(sysName)+'</h1><div class="sub">Cuadre Dominical &mdash; '+_cuadreSemanaTxt()+'</div>'
     +'<div class="sub" style="font-size:10px;margin-top:3px">Filtros: '+esc(_cuadreFiltrosTexto())+' &nbsp;|&nbsp; Generado: '+gen+'</div></div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin:10px 0">'+kpi+'</div>'
-    +'<table><thead><tr><th>Código</th><th>Líder</th><th>Pastor Zona</th><th>Sup. Sector</th><th>Reporte</th><th>AGF</th><th>Frutos</th><th>Ofrenda</th><th>Estado</th></tr></thead><tbody>'+rows+'</tbody></table>'
     +_cuadreMetaHTML()
+    +leaderTable
     +'</body></html>';
 }
 function _cuadreReporteHTML(){ return _cuadreSoloNoRealizados?_buildNoRealizadosHTML():_buildCuadreHTML(); }
