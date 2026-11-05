@@ -254,6 +254,16 @@ def _get_church_name(db):
     except: pass
     return "Iglesia Restauracion"
 
+def _formulario_digital_activo(db):
+    """True si el formulario digital está habilitado (config formulario_digital_activo)."""
+    try:
+        from app.models import Configuracion
+        c = db.query(Configuracion).filter(Configuracion.clave == "formulario_digital_activo").first()
+        if c and c.valor is not None:
+            return str(c.valor).strip().lower() not in ("false", "no", "0", "off", "")
+    except: pass
+    return True
+
 def _meta_ofrenda_grupo(db):
     """Meta de ofrenda por grupo (Q) — escalable. Default Q15.00 por grupo."""
     try:
@@ -950,6 +960,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "registrarReporteDigital":
             from datetime import date
             from datetime import datetime as dt_full
+            if not _formulario_digital_activo(db):
+                return {"ok": False, "msg": "El formulario digital está desactivado"}
             now_utc = dt_full.utcnow()
             guate = now_utc - timedelta(hours=6)
             today = guate.date()
@@ -1041,7 +1053,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             menuConfig = {}
             for m in ALL_MENU_IDS:
                 menuConfig[m] = configs.get(f"menu_mod_{m}", "SI") != "NO"
-            return {"ok": True, "ssId": configs.get("ssId",""), "nombre": configs.get("nombre","REDIL"), "formUrl": configs.get("formUrl",""), "formUrlPublic": configs.get("formUrlPublic",f"{_get_system_url()}/form"), "activo": True, "logo_url": configs.get("logo_url","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "logoUrl": configs.get("logoUrl","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "menuConfig": menuConfig, "ownerEmail": configs.get("ownerEmail","totalappgt@gmail.com"), "inactividadMinutos": int(configs.get("inactividadMinutos","60")), "metaGrupos": configs.get("metaGrupos","407"), "pastor_principal": configs.get("pastor_principal","PASTOR NELSON"), "meta_asistencia_adultos": configs.get("meta_asistencia_adultos","1950"), "meta_asistencia_ninos": configs.get("meta_asistencia_ninos","820"), "meta_ofrenda_grupo": configs.get("meta_ofrenda_grupo","15"), "driveFolderId": configs.get("driveFolderId","1OHBSDIk7e1FOyC1tgkkAJoRb_nJh2CKM"), "botPdfFolderId": configs.get("botPdfFolderId",""), "pdf_id": configs.get("pdf_id",""), "gemini_api_key": configs.get("gemini_api_key",""), "openrouter_api_key": configs.get("openrouter_api_key",""), "deepseek_api_key": configs.get("deepseek_api_key",""), "telegram_token": configs.get("telegram_token", os.getenv("TELEGRAM_TOKEN", "")), "telegram_chat_id": configs.get("telegram_chat_id", os.getenv("TELEGRAM_CHAT_ID", "")),
+            return {"ok": True, "ssId": configs.get("ssId",""), "nombre": configs.get("nombre","REDIL"), "formUrl": configs.get("formUrl",""), "formUrlPublic": configs.get("formUrlPublic",f"{_get_system_url()}/form"), "activo": True, "logo_url": configs.get("logo_url","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "logoUrl": configs.get("logoUrl","https://i.postimg.cc/SsCZVFwp/Logo-Icono2.jpg"), "menuConfig": menuConfig, "ownerEmail": configs.get("ownerEmail","totalappgt@gmail.com"), "inactividadMinutos": int(configs.get("inactividadMinutos","60")), "metaGrupos": configs.get("metaGrupos","407"), "pastor_principal": configs.get("pastor_principal","PASTOR NELSON"), "meta_asistencia_adultos": configs.get("meta_asistencia_adultos","1950"), "meta_asistencia_ninos": configs.get("meta_asistencia_ninos","820"), "meta_ofrenda_grupo": configs.get("meta_ofrenda_grupo","15"), "formulario_digital_activo": configs.get("formulario_digital_activo","True"), "driveFolderId": configs.get("driveFolderId","1OHBSDIk7e1FOyC1tgkkAJoRb_nJh2CKM"), "botPdfFolderId": configs.get("botPdfFolderId",""), "pdf_id": configs.get("pdf_id",""), "gemini_api_key": configs.get("gemini_api_key",""), "openrouter_api_key": configs.get("openrouter_api_key",""), "deepseek_api_key": configs.get("deepseek_api_key",""), "telegram_token": configs.get("telegram_token", os.getenv("TELEGRAM_TOKEN", "")), "telegram_chat_id": configs.get("telegram_chat_id", os.getenv("TELEGRAM_CHAT_ID", "")),
             "firebaseApiKey": configs.get("firebaseApiKey", os.getenv("FIREBASE_API_KEY", "")),
             "firebaseAuthDomain": configs.get("firebaseAuthDomain", os.getenv("FIREBASE_AUTH_DOMAIN", "totalappgt-d15b9.firebaseapp.com")),
             "firebaseProjectId": configs.get("firebaseProjectId", os.getenv("FIREBASE_PROJECT_ID", "totalappgt-d15b9")),
@@ -1347,7 +1359,17 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "getFormUrl":
             c = db.query(Configuracion).filter(Configuracion.clave == "formUrlPublic").first()
             url = c.valor if c else f"{_get_system_url()}/form"
-            return {"ok": True, "url": url}
+            return {"ok": True, "url": url, "activo": _formulario_digital_activo(db)}
+
+        if action == "toggleFormularioDigital":
+            nuevo = not _formulario_digital_activo(db)
+            c = db.query(Configuracion).filter(Configuracion.clave == "formulario_digital_activo").first()
+            if c:
+                c.valor = "True" if nuevo else "False"
+            else:
+                db.add(Configuracion(clave="formulario_digital_activo", valor="True" if nuevo else "False"))
+            db.commit()
+            return {"ok": True, "activo": nuevo}
 
         if action == "getFormHtml":
             # Buscar en múltiples ubicaciones posibles

@@ -1933,7 +1933,10 @@ function abrirVentanaImpresion(html){
 // REPORTE DIGITAL
 // ══════════════════════════════════════════════════════════
 function renderReporteDigital(el){
-  el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-mobile-alt"></i> Reporte Digital</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="newReporte()"><i class="fas fa-plus"></i> Nuevo Reporte</button></div></div>
+  var fActivo=!(APP.config&&APP.config.formulario_digital_activo&&String(APP.config.formulario_digital_activo).toLowerCase()==='false');
+  el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-mobile-alt"></i> Reporte Digital</h2><div class="mod-acts">`
+    +`<button id="btnFormToggle" class="btn btn-sm" style="${fActivo?'background:#16a34a;color:#fff':'background:#dc2626;color:#fff'}" onclick="toggleFormularioDigital()"><i class="fas fa-power-off"></i> Formulario: ${fActivo?'ACTIVO':'DESACTIVADO'}</button>`
+    +`<button class="btn btn-ok btn-sm" onclick="newReporte()"><i class="fas fa-plus"></i> Nuevo Reporte</button></div></div>
   <div class="card" style="background:linear-gradient(135deg,var(--pr) 0%,var(--pr2) 100%);color:#fff;margin-bottom:14px">
     <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
       <div style="font-size:32px">📱</div>
@@ -1955,6 +1958,20 @@ function renderReporteDigital(el){
     const data=(Array.isArray(d)?d:[]).filter(function(r){return (r['Reporte']||(r['Tipo de Reporte']==='Reporte Digital'?'Digital':''))==='Digital';}).slice(-20).reverse();
     if(!data.length){el2.innerHTML=`<div class="empty-r"><i class="fas fa-mobile-alt"></i><p>Sin reportes digitales aún</p></div>`;return;}
     el2.innerHTML=`<div style="overflow-x:auto"><table style="min-width:1100px;width:100%"><thead><tr><th>Fecha</th><th>Código</th><th>Líder</th><th>AGF</th><th>Ofr.Total</th><th>Ofrenda Recibida</th><th>Acción</th></tr></thead><tbody>${data.map(r=>{const isPend=r['Ofrenda Recibida']==='Pendiente'||r['Ofrenda Recibida']==='';return `<tr style="${isPend?'background:#fff5f5':''}"><td>${fmtD(r['Fecha'])}</td><td><span class="bdg bb">${esc(r['Codigo'])}</span></td><td><b>${esc(r['Lider'])}</b></td><td>${r['Asistencia Grupo Familiar']||0}</td><td>${r['Ofrenda Total']||''}</td><td>${isPend?'<span class="bdg br">⚠ Pendiente</span>':`<span class="bdg bg">✓ Recibida</span>`}</td><td>${isPend?`<button class="btn btn-ok btn-sm" onclick="confirmarOfrendaRapido('${esc(r['ID'])}','${esc(r['Lider'])}')"><i class="fas fa-check-circle"></i> Marcar Recibida</button>`:'—'}</td></tr>`;}).join('')}</tbody></table></div>`;
+  });
+}
+function toggleFormularioDigital(){
+  loading(true);
+  call('toggleFormularioDigital',{},function(_,res){
+    loading(false);
+    if(res&&res.ok){
+      if(APP.config)APP.config.formulario_digital_activo=res.activo?'True':'False';
+      toast(res.activo?'Formulario digital ACTIVADO':'Formulario digital DESACTIVADO','ok',3500);
+      var el=document.getElementById('mod_reporteDigital');
+      if(el)renderReporteDigital(el);
+    } else {
+      toast('Error: '+(res&&res.msg||''),'er');
+    }
   });
 }
 

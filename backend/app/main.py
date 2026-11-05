@@ -316,6 +316,21 @@ def descargar_pdf(no_serie: str):
 
 @app.get("/form", response_class=HTMLResponse)
 async def form_redirect():
+    activo = True
+    try:
+        from app.database import SessionLocal
+        from app.models import Configuracion
+        db = SessionLocal()
+        try:
+            c = db.query(Configuracion).filter(Configuracion.clave == "formulario_digital_activo").first()
+            if c and c.valor is not None and str(c.valor).strip().lower() in ("false", "no", "0", "off"):
+                activo = False
+        finally:
+            db.close()
+    except Exception:
+        pass
+    if not activo:
+        return HTMLResponse('<html><head><meta charset="UTF-8"></head><body style="font-family:Arial,sans-serif;text-align:center;padding:60px;color:#555"><div style="font-size:60px">📵</div><h1>Formulario desactivado</h1><p>El formulario digital está desactivado temporalmente.</p></body></html>')
     with open("static/formulario_digital.html", "r", encoding="utf-8") as f:
         return f.read()
 
