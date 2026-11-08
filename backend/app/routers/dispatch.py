@@ -456,7 +456,7 @@ DB_TO_GAS_ROLE = {
     'secretario': 'Secretario', 'tesorero': 'Tesorero', 'digitador': 'Digitador'
 }
 
-HERMANO_MAP = {"ID": "id", "CodigoL": "codigo_lead", "NombreL": "nombre", "Distrito": "distrito", "Zona": "zona", "Area": "area", "Sector": "sector", "Grupo": "grupo", "Pastor Zona": "pastor_zona", "Sup SectorL": "sup_sector", "Sup AreaL": "sup_area", "Ayuda Pastor": "ayuda_pastor", "Anfitrion": "anfitrion", "Direccion": "direccion", "CodigoSup": "codigo_sup", "CodigoPastor": "codigo_pastor"}
+HERMANO_MAP = {"ID": "id", "CodigoL": "codigo_lead", "NombreL": "nombre", "Distrito": "distrito", "Zona": "zona", "Area": "area", "Sector": "sector", "Grupo": "grupo", "Pastor Zona": "pastor_zona", "Sup SectorL": "sup_sector", "Sup AreaL": "sup_area", "Ayuda Pastor": "ayuda_pastor", "Anfitrion": "anfitrion", "Direccion": "direccion", "CodigoSup": "codigo_sup", "CodigoPastor": "codigo_pastor", "Estado Grupo": "estado_grupo", "Cubierto Por": "cubierto_por", "Observaciones Grupo": "observaciones_grupo"}
 SUPERVISOR_MAP = {"ID": "id", "CodigoSup": "codigo_sup", "NombreSup": "nombre_sup", "Distrito": "distrito", "Zona": "zona", "Area": "area", "Sector": "sector", "Telefono": "telefono", "Email": "email", "Activo": "activo"}
 PASTOR_MAP = {"ID": "id", "CodigoPastor": "codigo_pastor", "NombrePastor": "nombre_pastor", "Distrito": "distrito", "Zona": "zona", "Telefono": "telefono", "Email": "email", "Activo": "activo"}
 AYUDA_PASTOR_MAP = {"ID": "id", "CodigoAyuda": "codigo_ayuda", "NombreAyuda": "nombre_ayuda", "Distrito": "distrito", "Zona": "zona", "Area": "area", "Telefono": "telefono", "Email": "email", "Activo": "activo"}

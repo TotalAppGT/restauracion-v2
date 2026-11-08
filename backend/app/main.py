@@ -22,7 +22,14 @@ try:
     cols_r = [c["name"] for c in inspector.get_columns("reportes")]
     cols_g = [c["name"] for c in inspector.get_columns("gastos")]
     cols_gen = [c["name"] for c in inspector.get_columns("generadores_reporte")]
+    cols_h = [c["name"] for c in inspector.get_columns("hermanos")]
     with engine.connect() as conn:
+        if "estado_grupo" not in cols_h:
+            conn.execute(text("ALTER TABLE hermanos ADD COLUMN estado_grupo VARCHAR(20) DEFAULT 'Activo'"))
+        if "cubierto_por" not in cols_h:
+            conn.execute(text("ALTER TABLE hermanos ADD COLUMN cubierto_por VARCHAR(200) DEFAULT ''"))
+        if "observaciones_grupo" not in cols_h:
+            conn.execute(text("ALTER TABLE hermanos ADD COLUMN observaciones_grupo TEXT DEFAULT ''"))
         if "menu_permitido" not in cols_u:
             conn.execute(text("ALTER TABLE usuarios ADD COLUMN menu_permitido TEXT"))
         if "puede_ver_bitacora" not in cols_u:

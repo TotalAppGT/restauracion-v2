@@ -20,6 +20,9 @@ class Hermano(Base):
     direccion = Column(Text)
     codigo_sup = Column(String(50))
     codigo_pastor = Column(String(50))
+    estado_grupo = Column(String(20), default="Activo")
+    cubierto_por = Column(String(200), default="")
+    observaciones_grupo = Column(Text, default="")
 
 class Reporte(Base):
     __tablename__ = "reportes"
