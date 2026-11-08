@@ -489,7 +489,7 @@ def make_user_response(u):
     rol_lower = str(u.rol).lower().strip() if u.rol else ''
     gas_role = DB_TO_GAS_ROLE.get(rol_lower, 'Solo Lectura')
     
-    if rol_lower == 'propietario':
+    if rol_lower in ('propietario', 'admin'):
         menu = list(ALL_MENU_IDS)
     elif u.menu_permitido:
         menu = None
