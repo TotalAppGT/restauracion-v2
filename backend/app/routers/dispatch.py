@@ -431,14 +431,14 @@ def _construir_mensaje_notificacion(tipo, titulo, mensaje, evento, lugar, hora_e
 
 ALL_MENU_IDS = [
     'dashboard','reportes','reporteDigital','formulario','generador','informedetallado',
-    'hermanos','cargaMasiva','seguimientos','privilegios',
+    'hermanos','grupos','cargaMasiva','seguimientos','privilegios',
     'diezmos','gastos','cuadre','inventario','insumos','bautizos',
     'supervisores','pastores','pastoresdistrito','ayudapastor',
     'envio','notificaciones','contactos','usuarios','configuracion','bitacora'
 ]
 
 ROL_DEFAULT_MENU = {
-    'Admin':     ['dashboard','reportes','reporteDigital','formulario','generador','informedetallado','hermanos','cargaMasiva','seguimientos','privilegios','diezmos','gastos','cuadre','inventario','insumos','bautizos','envio','notificaciones','contactos','usuarios','supervisores','pastores','pastoresdistrito','ayudapastor','configuracion','bitacora'],
+    'Admin':     ['dashboard','reportes','reporteDigital','formulario','generador','informedetallado','hermanos','grupos','cargaMasiva','seguimientos','privilegios','diezmos','gastos','cuadre','inventario','insumos','bautizos','envio','notificaciones','contactos','usuarios','supervisores','pastores','pastoresdistrito','ayudapastor','configuracion','bitacora'],
     'Líder':     ['dashboard','reportes','reporteDigital','formulario','seguimientos'],
     'Secretario':['dashboard','reportes','reporteDigital','generador','seguimientos','envio','contactos'],
     'Tesorero':  ['dashboard','reportes','diezmos','gastos','generador','envio'],
@@ -804,6 +804,25 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         if action == "getHermanos":
             hermanos = db.query(Hermano).all()
             return [db_to_gas(h, HERMANO_MAP) for h in hermanos]
+
+        if action == "getBaseGrupos":
+            # Pastor de distrito resuelto por distrito
+            pd_map = {}
+            for pd_ in db.query(PastorDistrito).all():
+                if pd_.nombre_pastor_distrito:
+                    pd_map[str(pd_.distrito or "").strip()] = str(pd_.nombre_pastor_distrito).strip()
+            grupos = []
+            for h in db.query(Hermano).filter(Hermano.codigo_lead != None).order_by(Hermano.distrito, Hermano.zona, Hermano.nombre).all():
+                d = str(h.distrito or "").strip()
+                grupos.append({
+                    "ID": h.id, "CodigoL": h.codigo_lead, "NombreL": h.nombre,
+                    "Anfitrion": h.anfitrion or "", "SupSector": h.sup_sector or "",
+                    "AyudaPastor": h.ayuda_pastor or "", "PastorZona": h.pastor_zona or "",
+                    "PastorDistrito": pd_map.get(d, ""), "Distrito": h.distrito or "", "Zona": h.zona or "",
+                    "Estado": h.estado_grupo or "Activo", "CubiertoPor": h.cubierto_por or "",
+                    "Observaciones": h.observaciones_grupo or ""
+                })
+            return {"ok": True, "data": grupos}
 
         if action == "getHermanoByCodigo":
             h = db.query(Hermano).filter(Hermano.codigo_lead == payload.get("codigo")).first()
