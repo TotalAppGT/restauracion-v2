@@ -449,7 +449,7 @@ ROL_DEFAULT_MENU = {
 # Módulos añadidos al sistema después de que los usuarios existentes ya tenían su menú guardado.
 # Se auto-agregan al menú de los usuarios que lo tengan en el menú base de su rol, para que
 # los módulos nuevos aparezcan sin tener que re-editar cada usuario.
-AUTO_MODULOS_NUEVOS = ['informedetallado']
+AUTO_MODULOS_NUEVOS = ['informedetallado', 'grupos']
 
 DB_TO_GAS_ROLE = {
     'propietario': 'Admin', 'admin': 'Admin', 'lider': 'Líder',
