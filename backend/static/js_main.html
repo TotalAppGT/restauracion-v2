@@ -1967,8 +1967,8 @@ function toggleFormularioDigital(){
     if(res&&res.ok){
       if(APP.config)APP.config.formulario_digital_activo=res.activo?'True':'False';
       toast(res.activo?'Formulario digital ACTIVADO':'Formulario digital DESACTIVADO','ok',3500);
-      var el=document.getElementById('mod_reporteDigital');
-      if(el)renderReporteDigital(el);
+      var el1=document.getElementById('mod_reporteDigital');if(el1)renderReporteDigital(el1);
+      var el2=document.getElementById('mod_formulario');if(el2)renderFormulario(el2);
     } else {
       toast('Error: '+(res&&res.msg||''),'er');
     }
@@ -1993,7 +1993,10 @@ function copiarUrl(){
   _copiarTexto(url);
 }
 function renderFormulario(el){
-  el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-clipboard-list"></i> Formulario Externo</h2><div class="mod-acts"><button class="btn btn-ok btn-sm" onclick="copiarUrl()"><i class="fas fa-copy"></i> Copiar Link</button><a href="${APP.formUrlPublic||'#'}" target="_blank" class="btn btn-ol btn-sm"><i class="fas fa-external-link-alt"></i> Nueva pestaña</a></div></div>
+  var fActivo=!(APP.config&&APP.config.formulario_digital_activo&&String(APP.config.formulario_digital_activo).toLowerCase()==='false');
+  el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-clipboard-list"></i> Formulario Externo</h2><div class="mod-acts">`
+    +`<button id="btnFormToggle2" class="btn btn-sm" style="${fActivo?'background:#16a34a;color:#fff':'background:#dc2626;color:#fff'}" onclick="toggleFormularioDigital()"><i class="fas fa-power-off"></i> Formulario: ${fActivo?'ACTIVO':'DESACTIVADO'}</button>`
+    +`<button class="btn btn-ok btn-sm" onclick="copiarUrl()"><i class="fas fa-copy"></i> Copiar Link</button><a href="${APP.formUrlPublic||'#'}" target="_blank" class="btn btn-ol btn-sm"><i class="fas fa-external-link-alt"></i> Nueva pestaña</a></div></div>
   <div class="card" style="padding:0;overflow:hidden"><div id="formEmbed"><div class="empty-r"><i class="fas fa-circle-notch fa-spin"></i><p>Cargando formulario...</p></div></div></div>`;
   call('getFormHtml',{},function(_,res){
     var cont=document.getElementById('formEmbed');if(!cont)return;
