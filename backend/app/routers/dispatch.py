@@ -841,7 +841,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             ultimos = reportes_filtrados.order_by(Reporte.fecha.desc(), Reporte.id.desc()).limit(10).all()
             recientes = [{"Lider": r.lider, "Fecha": str(r.fecha), "Ofrenda Recibida": r.ofrenda_recibida or "Pendiente", "Tipo de Reporte": r.tipo_reporte or "", "Reporte": r.reporte_origen or ""} for r in ultimos]
             
-            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": reportes_count, "noRealizados": no_realizados, "asistencia": asistencia_total, "ofTotal": of_total, "ofrendaRecibida": round(ofrenda_recibida,2), "ofrendaPendiente": round(ofrenda_pendiente,2), "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados, "recientes": recientes, "frutosTipo": frutos_tipo, "gruposDistrito": grupos_distrito}
+            return {"ok": True, "lideres": lideres, "reportesMes": reportes_count, "gruposRealizados": len(codigos_rep), "noRealizados": no_realizados, "asistencia": asistencia_total, "ofTotal": of_total, "ofrendaRecibida": round(ofrenda_recibida,2), "ofrendaPendiente": round(ofrenda_pendiente,2), "convertidos": convertidos, "reconciliados": reconciliados, "segTotal": seg_total, "pendientes": pendientes, "metaGrupos": 407, "proxCron": [], "grafica": grafica, "rango": rango, "desde": str(desde), "hasta": str(hasta), "asistenciaDistrito": asist_distrito, "hermanosDistrito": hnos_distrito, "digitales": digitales, "manuales": manuales, "segPendientes": seg_pendientes, "segEnProceso": seg_enproceso, "segCompletados": seg_completados, "segCancelados": seg_cancelados, "recientes": recientes, "frutosTipo": frutos_tipo, "gruposDistrito": grupos_distrito}
 
         # ── HERMANOS (returns RAW ARRAY, matching GAS) ──
         if action == "getHermanos":
@@ -2015,8 +2015,9 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 INT_KEYS = ("asistencia", "hnos", "amigos", "niños", "ninos", "grupos", "lider", "cantidad", "stock", "reporte", "registros", "frutos", "bautiz", "cultos", "martes", "jueves", "domingo", "otros", "total", "codigo", "id", "personas")
                 soft_fill = PatternFill("solid", fgColor="EEF2F8")
                 for ri, fila in enumerate(filas):
-                    first_val = str(fila.get(cols[0], "") or "").strip().upper()
-                    is_group_row = first_val.startswith(("TOTAL", "SUBTOTAL", "DISTRITO", "ZONA", "META POR", "META DE"))
+                    c0 = str(fila.get(cols[0], "") or "").strip().upper()
+                    c1 = str(fila.get(cols[1], "") or "").strip().upper() if len(cols) > 1 else ""
+                    is_group_row = c0.startswith(("TOTAL", "SUBTOTAL", "DISTRITO", "META")) or c1.startswith(("TOTAL", "SUBTOTAL", "ZONA", "META"))
                     for ci, k in enumerate(cols):
                         v = fila.get(k)
                         if isinstance(v, (dict, list)):
