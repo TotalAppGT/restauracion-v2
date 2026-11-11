@@ -6107,29 +6107,36 @@ function _agruparCuadre(data){
   var map={};
   (data||[]).forEach(function(r){
     var d=(r.distrito||'').trim()||'S/D'; var z=(r.zona||'').trim()||'S/D';
-    if(!map[d])map[d]={distrito:d,totalLideres:0,entregaron:0,pendientes:0,pendienteEntrega:0,ofrendaTotal:0,asistencia:0,frutos:0,zonas:{}};
-    var dg=map[d]; dg.totalLideres++; dg.ofrendaTotal+=Number(r.ofrendaTotal||0); dg.asistencia+=Number(r.asistencia||0); dg.frutos+=Number(r.frutos||0);
-    if(!r.tieneReporte)dg.pendientes++; else if(!r.ofrendaRecibida)dg.pendienteEntrega++; else dg.entregaron++;
-    if(!dg.zonas[z])dg.zonas[z]={zona:z,totalLideres:0,entregaron:0,pendientes:0,pendienteEntrega:0,ofrendaTotal:0,asistencia:0,frutos:0,lideres:[]};
-    var zg=dg.zonas[z]; zg.totalLideres++; zg.ofrendaTotal+=Number(r.ofrendaTotal||0); zg.asistencia+=Number(r.asistencia||0); zg.frutos+=Number(r.frutos||0);
-    if(!r.tieneReporte)zg.pendientes++; else if(!r.ofrendaRecibida)zg.pendienteEntrega++; else zg.entregaron++;
+    var tot=Number(r.ofrendaTotal||0);
+    var rec=(r.ofrendaRecibidaAmt!==undefined&&r.ofrendaRecibidaAmt!==null)?Number(r.ofrendaRecibidaAmt):(r.ofrendaRecibida?tot:0);
+    var pen=(r.ofrendaPendienteAmt!==undefined&&r.ofrendaPendienteAmt!==null)?Number(r.ofrendaPendienteAmt):(r.ofrendaRecibida?0:tot);
+    if(!map[d])map[d]={distrito:d,totalLideres:0,entregaron:0,pendientes:0,pendienteEntrega:0,ofrendaTotal:0,ofrendaRecibida:0,ofrendaPendiente:0,asistencia:0,frutos:0,zonas:{}};
+    var dg=map[d]; dg.totalLideres++; dg.ofrendaTotal+=tot; dg.ofrendaRecibida+=rec; dg.ofrendaPendiente+=pen; dg.asistencia+=Number(r.asistencia||0); dg.frutos+=Number(r.frutos||0);
+    if(!r.tieneReporte)dg.pendientes++; else if(pen>0.0001)dg.pendienteEntrega++; else dg.entregaron++;
+    if(!dg.zonas[z])dg.zonas[z]={zona:z,totalLideres:0,entregaron:0,pendientes:0,pendienteEntrega:0,ofrendaTotal:0,ofrendaRecibida:0,ofrendaPendiente:0,asistencia:0,frutos:0,lideres:[]};
+    var zg=dg.zonas[z]; zg.totalLideres++; zg.ofrendaTotal+=tot; zg.ofrendaRecibida+=rec; zg.ofrendaPendiente+=pen; zg.asistencia+=Number(r.asistencia||0); zg.frutos+=Number(r.frutos||0);
+    if(!r.tieneReporte)zg.pendientes++; else if(pen>0.0001)zg.pendienteEntrega++; else zg.entregaron++;
     zg.lideres.push(r);
   });
   var nk=function(a,b){return (parseInt(a)||999)-(parseInt(b)||999);};
+  var rnd=function(v){return Math.round(v*100)/100;};
   return Object.keys(map).sort(nk).map(function(k){
     var dg=map[k];
-    dg.zonas=Object.keys(dg.zonas).sort(nk).map(function(zk){var zg=dg.zonas[zk];zg.ofrendaTotal=Math.round(zg.ofrendaTotal*100)/100;return zg;});
-    dg.ofrendaTotal=Math.round(dg.ofrendaTotal*100)/100;
+    dg.zonas=Object.keys(dg.zonas).sort(nk).map(function(zk){var zg=dg.zonas[zk];zg.ofrendaTotal=rnd(zg.ofrendaTotal);zg.ofrendaRecibida=rnd(zg.ofrendaRecibida);zg.ofrendaPendiente=rnd(zg.ofrendaPendiente);return zg;});
+    dg.ofrendaTotal=rnd(dg.ofrendaTotal);dg.ofrendaRecibida=rnd(dg.ofrendaRecibida);dg.ofrendaPendiente=rnd(dg.ofrendaPendiente);
     return dg;
   });
 }
 function _cuadreTotales(data){
   var t={n:0,ent:0,pe:0,sr:0,ofr:0,rec:0,pen:0,asis:0,fru:0};
   (data||[]).forEach(function(r){
-    t.n++; t.ofr+=Number(r.ofrendaTotal||0); t.asis+=Number(r.asistencia||0); t.fru+=Number(r.frutos||0);
-    if(!r.tieneReporte){t.sr++;t.pen+=Number(r.ofrendaTotal||0);}
-    else if(!r.ofrendaRecibida){t.pe++;t.pen+=Number(r.ofrendaTotal||0);}
-    else{t.ent++;t.rec+=Number(r.ofrendaTotal||0);}
+    var tot=Number(r.ofrendaTotal||0);
+    var rec=(r.ofrendaRecibidaAmt!==undefined&&r.ofrendaRecibidaAmt!==null)?Number(r.ofrendaRecibidaAmt):(r.ofrendaRecibida?tot:0);
+    var pen=(r.ofrendaPendienteAmt!==undefined&&r.ofrendaPendienteAmt!==null)?Number(r.ofrendaPendienteAmt):(r.ofrendaRecibida?0:tot);
+    t.n++; t.ofr+=tot; t.rec+=rec; t.pen+=pen; t.asis+=Number(r.asistencia||0); t.fru+=Number(r.frutos||0);
+    if(!r.tieneReporte){t.sr++;}
+    else if(pen>0.0001){t.pe++;}
+    else{t.ent++;}
   });
   t.ofr=Math.round(t.ofr*100)/100;t.rec=Math.round(t.rec*100)/100;t.pen=Math.round(t.pen*100)/100;
   return t;
@@ -6260,23 +6267,37 @@ function exportCuadreExcel(){
   var ag=_agruparCuadre(data);
   var t=_cuadreTotales(data);
   var rows=[];
+  function _amt(r){
+    var tot=Number(r.ofrendaTotal||0);
+    var rec=(r.ofrendaRecibidaAmt!==undefined&&r.ofrendaRecibidaAmt!==null)?Number(r.ofrendaRecibidaAmt):(r.ofrendaRecibida?tot:0);
+    var pen=(r.ofrendaPendienteAmt!==undefined&&r.ofrendaPendienteAmt!==null)?Number(r.ofrendaPendienteAmt):(r.ofrendaRecibida?0:tot);
+    return {tot:tot,rec:rec,pen:pen};
+  }
+  function _mk(o){
+    o=o||{};
+    return {'Distrito':o.d||'','Zona':o.z||'','Código':o.c||'','Líder':o.n||'','Pastor Zona':o.pz||'','Sup. Sector':o.ss||'',
+            'Reporte':o.r||'','Estado':o.e||'','AGF':Number(o.a||0),'Frutos':Number(o.f||0),
+            'Ofrenda Total Q':Number(o.t||0),'Ofrenda Recibida Q':Number(o.rec||0),'Ofrenda Pendiente Q':Number(o.pen||0)};
+  }
+  rows.push(_mk({d:'CUADRE DOMINICAL — '+_cuadreSemanaTxt()+' — '+_cuadreFiltrosTexto()}));
   ag.forEach(function(dg){
-    rows.push({'Distrito':'DISTRITO '+dg.distrito+(dg.pastorDistrito?' - PASTOR: '+dg.pastorDistrito:''),'Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':''});
+    rows.push(_mk({d:'DISTRITO '+dg.distrito+(dg.pastorDistrito?' · PASTOR: '+dg.pastorDistrito:'')}));
     dg.zonas.forEach(function(zg){
-      rows.push({'Distrito':dg.distrito,'Zona':'ZONA '+zg.zona,'Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':''});
+      rows.push(_mk({d:dg.distrito,z:'ZONA '+zg.zona}));
       zg.lideres.forEach(function(r){
-        rows.push({'Distrito':r.distrito||'','Zona':r.zona||'','Código':r.codigo||'','Líder':r.nombre||'','Pastor Zona':r.pastorZona||'','Sup. Sector':r.supSector||'','Reporte':r.tieneReporte?'Sí':'No','AGF':Number(r.asistencia||0),'Frutos':Number(r.frutos||0),'Ofrenda Q':Number(r.ofrendaTotal||0),'Estado':r.tieneReporte?(r.ofrendaRecibida?'Recibida':'Pendiente Entrega'):'No realizado'});
+        var m=_amt(r);
+        var est=r.tieneReporte?(m.pen>0.0001?'Pendiente Entrega':'Recibida'):'No realizado';
+        rows.push(_mk({d:r.distrito||'',z:r.zona||'',c:r.codigo||'',n:r.nombre||'',pz:r.pastorZona||'',ss:r.supSector||'',r:r.tieneReporte?'Sí':'No',e:est,a:r.asistencia,f:r.frutos,t:m.tot,rec:m.rec,pen:m.pen}));
       });
-      rows.push({'Distrito':'','Zona':'Subtotal Zona '+zg.zona,'Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':zg.entregaron+' realiz.','AGF':zg.asistencia,'Frutos':zg.frutos,'Ofrenda Q':Number(zg.ofrendaTotal),'Estado':''});
+      rows.push(_mk({z:'Subtotal Zona '+zg.zona,r:zg.entregaron+' realiz.',a:zg.asistencia,f:zg.frutos,t:zg.ofrendaTotal,rec:zg.ofrendaRecibida,pen:zg.ofrendaPendiente}));
     });
-    rows.push({'Distrito':'SUBTOTAL DISTRITO '+dg.distrito,'Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':dg.entregaron+' realiz.','AGF':dg.asistencia,'Frutos':dg.frutos,'Ofrenda Q':Number(dg.ofrendaTotal),'Estado':''});
+    rows.push(_mk({d:'SUBTOTAL DISTRITO '+dg.distrito,r:dg.entregaron+' realiz.',a:dg.asistencia,f:dg.frutos,t:dg.ofrendaTotal,rec:dg.ofrendaRecibida,pen:dg.ofrendaPendiente}));
   });
-  rows.push({'Distrito':'TOTAL GENERAL','Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':(t.ent+t.pe)+' realiz.','AGF':t.asis,'Frutos':t.fru,'Ofrenda Q':Number(t.ofr),'Estado':''});
+  rows.push(_mk({d:'TOTAL GENERAL',r:(t.ent+t.pe)+' realiz.',a:t.asis,f:t.fru,t:t.ofr,rec:t.rec,pen:t.pen}));
   // Sección META por Pastor de Zona
   var fDistM=(document.getElementById('cuaDist')||{}).value||'';
   var fZonaM=(document.getElementById('cuaZona')||{}).value||'';
-  rows.push({'Distrito':'','Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':'','META (Q)':'','ACTUAL (Q)':'','AVANCE (Q)':''});
-  rows.push({'Distrito':'META POR PASTOR DE ZONA (Q'+((_cuadreMetaTotals&&_cuadreMetaTotals.metaGrupo)||15)+' por grupo)','Zona':'','Código':'','Líder':'','Pastor Zona':'','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':'','META (Q)':'','ACTUAL (Q)':'','AVANCE (Q)':''});
+  rows.push(_mk({d:'META POR PASTOR DE ZONA (Q'+((_cuadreMetaTotals&&_cuadreMetaTotals.metaGrupo)||15)+' por grupo)'}));
   var gGru=0,gMeta=0,gAct=0,gAva=0;
   (_cuadreAgrupado||[]).forEach(function(dg){
     if(fDistM&&String(dg.distrito)!==fDistM)return;
@@ -6284,10 +6305,14 @@ function exportCuadreExcel(){
       if(fZonaM&&String(zg.zona)!==fZonaM)return;
       var m=Number(zg.meta||0),a=Number(zg.actual||0),av=Number(zg.avance||0);
       gGru+=Number(zg.totalLideres||0);gMeta+=m;gAct+=a;gAva+=av;
-      rows.push({'Distrito':dg.distrito,'Zona':'','Código':'','Líder':'','Pastor Zona':zg.pastor||('Zona '+zg.zona),'Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':zg.totalLideres,'META (Q)':Number(m),'ACTUAL (Q)':Number(a),'AVANCE (Q)':Number(av)});
+      var row=_mk({d:dg.distrito,pz:zg.pastor||('Zona '+zg.zona)});
+      row['Grupos']=Number(zg.totalLideres||0);row['META (Q)']=m;row['ACTUAL (Q)']=a;row['AVANCE (Q)']=av;
+      rows.push(row);
     });
   });
-  rows.push({'Distrito':'','Zona':'','Código':'','Líder':'','Pastor Zona':'TOTAL GENERAL','Sup. Sector':'','Reporte':'','AGF':'','Frutos':'','Ofrenda Q':'','Estado':'','Grupos':gGru,'META (Q)':Number(gMeta),'ACTUAL (Q)':Number(gAct),'AVANCE (Q)':Number(gAva)});
+  var totRow=_mk({pz:'TOTAL GENERAL'});
+  totRow['Grupos']=gGru;totRow['META (Q)']=Number(gMeta);totRow['ACTUAL (Q)']=Number(gAct);totRow['AVANCE (Q)']=Number(gAva);
+  rows.push(totRow);
   exportXLS(rows,'Cuadre Dominical','cuadre_dominical');
 }
 function _cuadreMetaHTML(){

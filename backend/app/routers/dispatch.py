@@ -275,6 +275,47 @@ def _meta_ofrenda_grupo(db):
     except: pass
     return 15.0
 
+def _norm_code(s):
+    return str(s or "").strip().upper()
+
+def _recibida(r):
+    """True si la ofrenda del reporte ya fue recibida (físico/manual o digital marcado)."""
+    return str(getattr(r, "ofrenda_recibida", "") or "").strip().lower() == "recibida"
+
+def _ofrenda_amt(r):
+    """Monto de ofrenda del reporte, con respaldo en iglesia+bus si el total viene en 0."""
+    try:
+        v = float(getattr(r, "ofrenda_total", 0) or 0)
+    except Exception:
+        v = 0.0
+    if v == 0:
+        try:
+            v = float(getattr(r, "ofrenda_iglesia", 0) or 0) + float(getattr(r, "ofrenda_bus", 0) or 0)
+        except Exception:
+            pass
+    return round(v, 2)
+
+def _dedup_reportes(reportes):
+    """Un reporte efectivo por grupo y fecha: evita que varios digitadores
+    dupliquen la ofrenda del mismo grupo. Prefiere el marcado como 'Recibida'
+    y, entre iguales, el más reciente (mayor id)."""
+    best = {}
+    order = []
+    for r in reportes:
+        code = _norm_code(getattr(r, "codigo", ""))
+        name = _norm_code(getattr(r, "lider", ""))
+        key = (code or ("L:" + name), getattr(r, "fecha", None))
+        cur = best.get(key)
+        if cur is None:
+            best[key] = r
+            order.append(key)
+        else:
+            if _recibida(r) and not _recibida(cur):
+                best[key] = r
+            elif _recibida(r) == _recibida(cur) and int(getattr(r, "id", 0) or 0) > int(getattr(cur, "id", 0) or 0):
+                best[key] = r
+    return [best[k] for k in order]
+
 def _meta_por_pastor_zona(db, desde, hasta):
     """Meta de ofrenda por pastor de zona (Q X grupo). Devuelve (filas, total, meta_of)."""
     meta_of = _meta_ofrenda_grupo(db)
@@ -289,7 +330,7 @@ def _meta_por_pastor_zona(db, desde, hasta):
         k = (str(p.distrito or "").strip(), str(p.zona or "").strip())
         if k in zonas and p.nombre_pastor:
             zonas[k]["pastor"] = str(p.nombre_pastor).strip()
-    herm_by_cod = {str(h.codigo_lead).strip(): h for h in db.query(Hermano).all() if h.codigo_lead}
+    herm_by_cod = {_norm_code(h.codigo_lead): h for h in db.query(Hermano).all() if h.codigo_lead}
     q = db.query(Reporte)
     if desde:
         try: q = q.filter(Reporte.fecha >= datetime.strptime(desde, "%Y-%m-%d").date())
@@ -297,15 +338,15 @@ def _meta_por_pastor_zona(db, desde, hasta):
     if hasta:
         try: q = q.filter(Reporte.fecha <= datetime.strptime(hasta, "%Y-%m-%d").date())
         except: pass
-    for r in q.all():
-        h = herm_by_cod.get(str(r.codigo or "").strip())
+    for r in _dedup_reportes(q.all()):
+        if not _recibida(r):
+            continue
+        h = herm_by_cod.get(_norm_code(r.codigo))
         d = str(r.distrito or (h.distrito if h else "") or "").strip()
         z = str(r.zona or (h.zona if h else "") or "").strip()
         k = (d, z)
         if k not in zonas: continue
-        if str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None):
-            continue
-        zonas[k]["actual"] += float(r.ofrenda_total or 0)
+        zonas[k]["actual"] += _ofrenda_amt(r)
     filas = []
     total = {"grupos": 0, "meta": 0.0, "actual": 0.0, "avance": 0.0}
     for k in sorted(zonas.keys(), key=lambda x: (int(x[0]) if x[0].isdigit() else 99999, x[0], int(x[1]) if x[1].isdigit() else 99999, x[1])):
@@ -698,11 +739,12 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 else: hasta = hoy.replace(month=q_inicio+3, day=1) - timedelta(days=1)
             
             reportes_filtrados = db.query(Reporte).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta)
+            rep_eff = _dedup_reportes(reportes_filtrados.all())
             lideres = db.query(Hermano).filter(Hermano.codigo_lead != None).count()
-            reportes_count = reportes_filtrados.count()
-            pendientes = reportes_filtrados.filter(Reporte.ofrenda_recibida.in_(["Pendiente", ""])).count()
-            asistencia_total = int(db.query(func.coalesce(func.sum(Reporte.asistencia), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar() or 0)
-            of_total = round(float(db.query(func.coalesce(func.sum(Reporte.ofrenda_total), 0)).filter(Reporte.fecha >= desde, Reporte.fecha <= hasta).scalar() or 0), 2)
+            reportes_count = len(rep_eff)
+            pendientes = sum(1 for r in rep_eff if not _recibida(r))
+            asistencia_total = int(sum(int(r.asistencia or 0) for r in rep_eff))
+            of_total = round(sum(_ofrenda_amt(r) for r in rep_eff), 2)
             
             # Seguimientos
             segs_q = db.query(Seguimiento).filter(Seguimiento.fecha >= desde, Seguimiento.fecha <= hasta)
@@ -722,8 +764,8 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             }
             
             # Digital vs Manual
-            digitales = reportes_filtrados.filter(Reporte.reporte_origen == "Digital").count()
-            manuales = reportes_filtrados.count() - digitales
+            digitales = sum(1 for r in rep_eff if str(r.reporte_origen or "").strip().lower() == "digital")
+            manuales = len(rep_eff) - digitales
             
             # Mapa codigo -> hermano (para resolver distrito de reportes sin distrito)
             herm_by_cod = {}
@@ -733,14 +775,14 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             dist_agg = {}
             ofrenda_recibida = 0.0; ofrenda_pendiente = 0.0
             codigos_rep = set()
-            for r in reportes_filtrados.all():
+            for r in rep_eff:
                 h = herm_by_cod.get(str(r.codigo or "").strip())
                 dd = str(r.distrito or (h.distrito if h else "") or "").strip()
                 if r.codigo: codigos_rep.add(str(r.codigo))
-                if str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None):
-                    ofrenda_pendiente += float(r.ofrenda_total or 0)
+                if not _recibida(r):
+                    ofrenda_pendiente += _ofrenda_amt(r)
                 else:
-                    ofrenda_recibida += float(r.ofrenda_total or 0)
+                    ofrenda_recibida += _ofrenda_amt(r)
                 if not dd: continue
                 a = dist_agg.setdefault(dd, {"distrito": dd, "asistencia": 0, "grupos": 0, "ofrenda": 0.0})
                 a["asistencia"] += int(r.asistencia or 0)
@@ -761,7 +803,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 dd = str(h.distrito or "").strip()
                 if dd: lideres_dist[dd] = lideres_dist.get(dd, 0) + 1
             realizados_dist = {}
-            for r in reportes_filtrados.all():
+            for r in rep_eff:
                 h = herm_by_cod.get(str(r.codigo or "").strip())
                 dd = str(r.distrito or (h.distrito if h else "") or "").strip()
                 if dd and r.codigo: realizados_dist.setdefault(dd, set()).add(str(r.codigo))
@@ -781,13 +823,14 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 if m == 12: mf = datetime(y+1, 1, 1).date() - timedelta(days=1)
                 else: mf = datetime(y, m+1, 1).date() - timedelta(days=1)
                 rp = db.query(Reporte).filter(Reporte.fecha >= mi, Reporte.fecha <= mf)
+                month_eff = _dedup_reportes(rp.all())
                 g = {}
                 g["mes"] = mi.strftime("%b %Y")
-                g["asistencia"] = int(db.query(func.coalesce(func.sum(Reporte.asistencia),0)).filter(Reporte.fecha >= mi, Reporte.fecha <= mf).scalar() or 0)
-                g["ofrendas"] = round(float(db.query(func.coalesce(func.sum(Reporte.ofrenda_total),0)).filter(Reporte.fecha >= mi, Reporte.fecha <= mf).scalar() or 0), 2)
-                g["grupos"] = rp.count()
-                g["digitales"] = rp.filter(Reporte.reporte_origen == "Digital").count()
-                g["manuales"] = rp.filter(Reporte.reporte_origen != "Digital").count()
+                g["asistencia"] = int(sum(int(x.asistencia or 0) for x in month_eff))
+                g["ofrendas"] = round(sum(_ofrenda_amt(x) for x in month_eff), 2)
+                g["grupos"] = len(month_eff)
+                g["digitales"] = sum(1 for x in month_eff if str(x.reporte_origen or "").strip().lower() == "digital")
+                g["manuales"] = len(month_eff) - g["digitales"]
                 conv = db.query(Seguimiento).filter(Seguimiento.fecha >= mi, Seguimiento.fecha <= mf, Seguimiento.tipo == "Convertido").count()
                 rec = db.query(Seguimiento).filter(Seguimiento.fecha >= mi, Seguimiento.fecha <= mf, Seguimiento.tipo.ilike("%reconcil%")).count()
                 g["convertidos"] = conv
@@ -838,8 +881,6 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
         # ── REPORTES (returns raw array) ──
         if action == "getReportes":
             q = db.query(Reporte)
-            if payload.get("pendientes"):
-                q = q.filter(Reporte.ofrenda_recibida.in_(["Pendiente", ""]))
             if payload.get("desde"):
                 q = q.filter(Reporte.fecha >= payload["desde"])
             if payload.get("hasta"):
@@ -847,6 +888,10 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if payload.get("codigo"):
                 q = q.filter(Reporte.codigo == payload["codigo"])
             reportes = q.order_by(Reporte.fecha.desc()).limit(5000).all()
+            # Un solo registro efectivo por grupo y fecha (evita duplicados)
+            reportes = _dedup_reportes(reportes)
+            if payload.get("pendientes"):
+                reportes = [r for r in reportes if not _recibida(r)]
 
             # Resolver jerarquia desde el hermano (los reportes digitales suelen
             # venir sin distrito/zona/area; se completan desde el lider por codigo)
@@ -1053,13 +1098,13 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             q = db.query(Reporte)
             if payload.get("desde"): q = q.filter(Reporte.fecha >= payload["desde"])
             if payload.get("hasta"): q = q.filter(Reporte.fecha <= payload["hasta"])
-            reportes = q.all()
+            reportes = _dedup_reportes(q.all())
             total = len(reportes)
-            asistencia = sum(r.asistencia or 0 for r in reportes)
-            of_total = sum(float(r.ofrenda_total or 0) for r in reportes)
-            pendientes = sum(1 for r in reportes if r.ofrenda_recibida in ("Pendiente", ""))
-            hnos = sum(r.hnos or 0 for r in reportes)
-            amigos = sum(r.amigos or 0 for r in reportes)
+            asistencia = sum(int(r.asistencia or 0) for r in reportes)
+            of_total = sum(_ofrenda_amt(r) for r in reportes)
+            pendientes = sum(1 for r in reportes if not _recibida(r))
+            hnos = sum(int(r.hnos or 0) for r in reportes)
+            amigos = sum(int(r.amigos or 0) for r in reportes)
             return {"ok": True, "total": total, "asistencia": asistencia, "ofTotal": round(of_total, 2), "pendientes": pendientes, "hnos": hnos, "amigos": amigos}
 
         # ── CONFIG ──
@@ -1467,66 +1512,133 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     if rk: frutos_map[rk] = frutos_map.get(rk, 0) + 1
             except Exception:
                 pass
-            codigos_reportados = set(r.codigo for r in reportes)
-            data, total_lideres, entregaron, pendientes_c, ofrenda_total = [], 0, 0, 0, 0.0
+            # Un solo registro efectivo por grupo y fecha (evita duplicados de digitadores)
+            reportes = _dedup_reportes(reportes)
+            meta_ofrenda_grupo = _meta_ofrenda_grupo(db)
+
+            lead_by = {}
+            for h in lideres:
+                k = _norm_code(h.codigo_lead)
+                if k and k not in lead_by:
+                    lead_by[k] = h
+
+            total_lideres = len(lideres)
+            entregaron = 0
+            pendientes_c = 0
+            pendiente_entrega = 0
             total_asistencia = 0
             total_frutos = 0
+            ofrenda_total = 0.0
             total_ofrenda_recibida = 0.0
-            meta_ofrenda_grupo = _meta_ofrenda_grupo(db)
-            pendiente_entrega = 0  # digital enviado pero ofrenda no entregada
-            # Agrupar por distrito
-            distritos = {}
-            for h in lideres:
-                total_lideres += 1
-                reporto = h.codigo_lead in codigos_reportados
-                rpts = [r for r in reportes if r.codigo == h.codigo_lead]
-                ofrenda = sum(float(r.ofrenda_total or 0) for r in rpts)
-                asist = sum(int(r.asistencia or 0) for r in rpts)
-                # ofrenda recibida: un reporte digital pendiente cuenta como "pendiente entrega";
-                # cualquier reporte fisico/manual cuenta como recibido (todo el ingreso es fisico)
-                recibida = reporto and not any(
-                    str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None)
-                    for r in rpts
-                )
-                ofrenda_recibida_val = sum(float(r.ofrenda_total or 0) for r in rpts if r.ofrenda_recibida not in ("Pendiente", "", None))
-                # Monto realmente recibido (fisico/manual = recibido; solo digital-pendiente no cuenta)
-                ofrenda_rec = sum(float(r.ofrenda_total or 0) for r in rpts if not (
-                    str(r.reporte_origen or "").strip().lower() == "digital" and r.ofrenda_recibida in ("Pendiente", "", None)
-                ))
-                if not reporto:
-                    pendientes_c += 1  # sin reporte (grupo NO realizado)
-                elif not recibida:
-                    pendiente_entrega += 1  # envio digital pero no entrego
+            total_ofrenda_pendiente = 0.0
+            sin_lider = 0
+
+            # Agrupar reportes efectivos por líder (o huérfano sin líder)
+            agg = {}
+            for r in reportes:
+                code = _norm_code(r.codigo)
+                h = lead_by.get(code)
+                key = code if h else ("O:" + (code or _norm_code(r.lider)))
+                a = agg.get(key)
+                if a is None:
+                    a = {"codigo": (h.codigo_lead if h else (r.codigo or "")),
+                         "nombre": (h.nombre if h else (r.lider or "")),
+                         "esLider": bool(h), "registros": 0, "latest_id": -1,
+                         "ofrendaTotal": 0.0, "recAmt": 0.0, "pendAmt": 0.0,
+                         "asistencia": 0, "pastorZona": "", "supSector": "", "d": "", "z": ""}
+                    agg[key] = a
+                    if not h: sin_lider += 1
+                amt = _ofrenda_amt(r)
+                a["ofrendaTotal"] += amt
+                a["registros"] += 1
+                a["asistencia"] += int(r.asistencia or 0)
+                if _recibida(r): a["recAmt"] += amt
+                else: a["pendAmt"] += amt
+                rid = int(getattr(r, "id", 0) or 0)
+                rd = str(r.distrito or "").strip(); rz = str(r.zona or "").strip()
+                hd = str(h.distrito or "").strip() if h else ""
+                hz = str(h.zona or "").strip() if h else ""
+                if rid >= a["latest_id"]:
+                    a["latest_id"] = rid
+                    a["d"] = rd or hd
+                    a["z"] = rz or hz
+                    a["pastorZona"] = str(r.pastor_zona or (h.pastor_zona if h else "") or "").strip()
+                    a["supSector"] = str(r.sup_sector or (h.sup_sector if h else "") or "").strip()
                 else:
-                    entregaron += 1  # ofrenda recibida
-                ofrenda_total += ofrenda
-                total_asistencia += asist
-                total_ofrenda_recibida += ofrenda_rec
-                frutos = frutos_map.get((h.nombre or "").strip().upper(), 0)
+                    if not a["d"]: a["d"] = rd or hd
+                    if not a["z"]: a["z"] = rz or hz
+                if not a["pastorZona"]: a["pastorZona"] = str((h.pastor_zona if h else "") or r.pastor_zona or "").strip()
+                if not a["supSector"]: a["supSector"] = str((h.sup_sector if h else "") or r.sup_sector or "").strip()
+
+            # Líderes sin reporte en el periodo (grupo NO realizado)
+            for h in lideres:
+                k = _norm_code(h.codigo_lead)
+                if not k or k in agg: continue
+                agg[k] = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "esLider": True,
+                          "registros": 0, "latest_id": -1, "ofrendaTotal": 0.0, "recAmt": 0.0, "pendAmt": 0.0,
+                          "asistencia": 0, "pastorZona": str(h.pastor_zona or "").strip(),
+                          "supSector": str(h.sup_sector or "").strip(),
+                          "d": str(h.distrito or "").strip(), "z": str(h.zona or "").strip()}
+
+            def _dsort(x):
+                try: return (0, int(x))
+                except Exception: return (1, str(x))
+
+            data = []
+            distritos = {}
+            for key, a in agg.items():
+                d = str(a["d"] or "?"); z = str(a["z"] or "?")
+                reporto = a["registros"] > 0
+                tot_amt = round(a["ofrendaTotal"], 2)
+                rec_amt = round(a["recAmt"], 2)
+                pend_amt = round(a["pendAmt"], 2)
+                recibida_flag = reporto and pend_amt <= 0.0001
+                if a["esLider"]:
+                    if not reporto: pendientes_c += 1
+                    elif pend_amt > 0.0001: pendiente_entrega += 1
+                    else: entregaron += 1
+                nombre = a["nombre"] or ""
+                frutos = frutos_map.get(str(nombre).strip().upper(), 0) if a["esLider"] else 0
                 total_frutos += frutos
-                d = str(h.distrito or "?")
-                z = str(h.zona or "?")
-                item = {"codigo": h.codigo_lead or "", "nombre": h.nombre or "", "tieneReporte": reporto, "ofrendaTotal": round(ofrenda, 2), "ofrendaRecibida": recibida, "ofrendaRecibidaAmt": round(ofrenda_rec, 2), "asistencia": asist, "frutos": frutos, "pastorZona": h.pastor_zona or "", "supSector": h.sup_sector or "", "distrito": d, "zona": z}
+                total_asistencia += a["asistencia"]
+                ofrenda_total += tot_amt
+                total_ofrenda_recibida += rec_amt
+                total_ofrenda_pendiente += pend_amt
+                item = {"codigo": a["codigo"] or "", "nombre": nombre, "tieneReporte": reporto,
+                        "ofrendaTotal": tot_amt, "ofrendaRecibida": recibida_flag,
+                        "ofrendaRecibidaAmt": rec_amt, "ofrendaPendienteAmt": pend_amt,
+                        "asistencia": a["asistencia"], "frutos": frutos,
+                        "pastorZona": a["pastorZona"], "supSector": a["supSector"],
+                        "distrito": d, "zona": z, "registros": a["registros"], "esLider": a["esLider"]}
                 data.append(item)
-                if d not in distritos: distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "ofrendaRecibida": 0.0, "asistencia": 0, "frutos": 0, "zonas": {}}
-                distritos[d]["totalLideres"] += 1
-                if not reporto: distritos[d]["pendientes"] += 1
-                elif not recibida: distritos[d]["pendienteEntrega"] += 1
-                else: distritos[d]["entregaron"] += 1
-                distritos[d]["ofrendaTotal"] += ofrenda
-                distritos[d]["ofrendaRecibida"] += ofrenda_rec
-                distritos[d]["asistencia"] += asist
-                distritos[d]["frutos"] += frutos
-                if z not in distritos[d]["zonas"]: distritos[d]["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0, "pendienteEntrega": 0, "ofrendaTotal": 0.0, "ofrendaRecibida": 0.0, "asistencia": 0, "frutos": 0, "lideres": []}
-                distritos[d]["zonas"][z]["totalLideres"] += 1
-                if not reporto: distritos[d]["zonas"][z]["pendientes"] += 1
-                elif not recibida: distritos[d]["zonas"][z]["pendienteEntrega"] += 1
-                else: distritos[d]["zonas"][z]["entregaron"] += 1
-                distritos[d]["zonas"][z]["ofrendaTotal"] += ofrenda
-                distritos[d]["zonas"][z]["ofrendaRecibida"] += ofrenda_rec
-                distritos[d]["zonas"][z]["asistencia"] += asist
-                distritos[d]["zonas"][z]["frutos"] += frutos
-                distritos[d]["zonas"][z]["lideres"].append(item)
+                if d not in distritos:
+                    distritos[d] = {"distrito": d, "totalLideres": 0, "entregaron": 0, "pendientes": 0,
+                                    "pendienteEntrega": 0, "ofrendaTotal": 0.0, "ofrendaRecibida": 0.0,
+                                    "ofrendaPendiente": 0.0, "asistencia": 0, "frutos": 0, "zonas": {}}
+                dg = distritos[d]
+                dg["totalLideres"] += 1
+                if a["esLider"]:
+                    if not reporto: dg["pendientes"] += 1
+                    elif pend_amt > 0.0001: dg["pendienteEntrega"] += 1
+                    else: dg["entregaron"] += 1
+                dg["ofrendaTotal"] += tot_amt; dg["ofrendaRecibida"] += rec_amt
+                dg["ofrendaPendiente"] += pend_amt
+                dg["asistencia"] += a["asistencia"]; dg["frutos"] += frutos
+                if z not in dg["zonas"]:
+                    dg["zonas"][z] = {"zona": z, "totalLideres": 0, "entregaron": 0, "pendientes": 0,
+                                      "pendienteEntrega": 0, "ofrendaTotal": 0.0, "ofrendaRecibida": 0.0,
+                                      "ofrendaPendiente": 0.0, "asistencia": 0, "frutos": 0, "lideres": []}
+                zg = dg["zonas"][z]
+                zg["totalLideres"] += 1
+                if a["esLider"]:
+                    if not reporto: zg["pendientes"] += 1
+                    elif pend_amt > 0.0001: zg["pendienteEntrega"] += 1
+                    else: zg["entregaron"] += 1
+                zg["ofrendaTotal"] += tot_amt; zg["ofrendaRecibida"] += rec_amt
+                zg["ofrendaPendiente"] += pend_amt
+                zg["asistencia"] += a["asistencia"]; zg["frutos"] += frutos
+                zg["lideres"].append(item)
+
             # Convertir zonas de dict a lista ordenada + meta/actual/avance
             pd_map = {}
             for pd_ in db.query(PastorDistrito).all():
@@ -1534,21 +1646,21 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     pd_map[str(pd_.distrito or "").strip()] = str(pd_.nombre_pastor_distrito).strip()
             total_meta = 0.0
             distritos_list = []
-            for dk in sorted(distritos.keys()):
+            for dk in sorted(distritos.keys(), key=_dsort):
                 dg = distritos[dk]
                 zonas_list = []
-                for zk in sorted(dg["zonas"].keys()):
+                for zk in sorted(dg["zonas"].keys(), key=_dsort):
                     zg = dg["zonas"][zk]
-                    zg["ofrendaTotal"] = round(zg["ofrendaTotal"], 2)
-                    zg["ofrendaRecibida"] = round(zg["ofrendaRecibida"], 2)
+                    for f in ("ofrendaTotal", "ofrendaRecibida", "ofrendaPendiente"):
+                        zg[f] = round(zg[f], 2)
                     zg["meta"] = round(zg["totalLideres"] * meta_ofrenda_grupo, 2)
                     zg["actual"] = zg["ofrendaRecibida"]
                     zg["avance"] = round(zg["actual"] - zg["meta"], 2)
                     zg["pastor"] = zg["lideres"][0]["pastorZona"] if zg["lideres"] else ""
                     zonas_list.append(zg)
                 dg["zonas"] = zonas_list
-                dg["ofrendaTotal"] = round(dg["ofrendaTotal"], 2)
-                dg["ofrendaRecibida"] = round(dg["ofrendaRecibida"], 2)
+                for f in ("ofrendaTotal", "ofrendaRecibida", "ofrendaPendiente"):
+                    dg[f] = round(dg[f], 2)
                 dg["meta"] = round(dg["totalLideres"] * meta_ofrenda_grupo, 2)
                 dg["actual"] = dg["ofrendaRecibida"]
                 dg["avance"] = round(dg["actual"] - dg["meta"], 2)
@@ -1556,7 +1668,18 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 dg["pastorDistrito"] = pd_map.get(str(dk).strip(), "")
                 distritos_list.append(dg)
             generar_pdf = payload.get("generarPDF", False)
-            result = {"ok": True, "data": data, "agrupado": distritos_list, "totalLideres": total_lideres, "entregaron": entregaron, "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega, "gruposRealizados": entregaron + pendiente_entrega, "ofrendaTotal": round(ofrenda_total, 2), "ofrendaRecibida": round(total_ofrenda_recibida, 2), "asistenciaTotal": total_asistencia, "frutosTotal": total_frutos, "metaOfrendaGrupo": meta_ofrenda_grupo, "meta": round(total_meta, 2), "actual": round(total_ofrenda_recibida, 2), "avance": round(total_ofrenda_recibida - total_meta, 2)}
+            result = {"ok": True, "data": data, "agrupado": distritos_list,
+                      "totalLideres": total_lideres, "entregaron": entregaron,
+                      "pendientes": pendientes_c, "pendienteEntrega": pendiente_entrega,
+                      "gruposRealizados": entregaron + pendiente_entrega,
+                      "ofrendaTotal": round(ofrenda_total, 2),
+                      "ofrendaRecibida": round(total_ofrenda_recibida, 2),
+                      "ofrendaPendiente": round(total_ofrenda_pendiente, 2),
+                      "asistenciaTotal": total_asistencia, "frutosTotal": total_frutos,
+                      "metaOfrendaGrupo": meta_ofrenda_grupo, "meta": round(total_meta, 2),
+                      "actual": round(total_ofrenda_recibida, 2),
+                      "avance": round(total_ofrenda_recibida - total_meta, 2),
+                      "sinLider": sin_lider, "reportesUnicos": len(reportes)}
             if generar_pdf:
                 try:
                     from fpdf import FPDF
@@ -1888,7 +2011,12 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     c.fill = hdr_fill
                     c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                     c.border = border
+                MONEY_KEYS = ("ofrenda", "monto", "meta", "actual", "avance", "precio", "valor", "ingreso", "gasto")
+                INT_KEYS = ("asistencia", "hnos", "amigos", "niños", "ninos", "grupos", "lider", "cantidad", "stock", "reporte", "registros", "frutos", "bautiz", "cultos", "martes", "jueves", "domingo", "otros", "total", "codigo", "id", "personas")
+                soft_fill = PatternFill("solid", fgColor="EEF2F8")
                 for ri, fila in enumerate(filas):
+                    first_val = str(fila.get(cols[0], "") or "").strip().upper()
+                    is_group_row = first_val.startswith(("TOTAL", "SUBTOTAL", "DISTRITO", "ZONA", "META POR", "META DE"))
                     for ci, k in enumerate(cols):
                         v = fila.get(k)
                         if isinstance(v, (dict, list)):
@@ -1899,6 +2027,16 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                         c = ws.cell(row=ri + 2, column=ci + 1, value=v)
                         c.border = border
                         c.alignment = Alignment(vertical="top", wrap_text=True)
+                        kl = str(k).lower()
+                        if isinstance(v, (int, float)) and not isinstance(v, bool):
+                            if any(t in kl for t in MONEY_KEYS):
+                                c.number_format = '#,##0.00'
+                            elif any(t in kl for t in INT_KEYS):
+                                c.number_format = '#,##0'
+                            c.alignment = Alignment(horizontal="right", vertical="top")
+                        if is_group_row:
+                            c.font = Font(bold=True)
+                            c.fill = soft_fill
                 ws.freeze_panes = "A2"
                 ws.auto_filter.ref = f"A1:{_gcl(len(cols))}1"
                 for ci in range(len(cols)):
@@ -2208,7 +2346,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 except: pass
             if distrito_f: q = q.filter(Reporte.distrito == distrito_f)
             if zona_f: q = q.filter(Reporte.zona == zona_f)
-            reportes = q.all()
+            reportes = _dedup_reportes(q.all())
 
             # Configuración
             cfg = {}
@@ -2530,7 +2668,7 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
             if filtro_sup_sector: q = q.filter(Reporte.sup_sector.ilike(f"%{filtro_sup_sector}%"))
             if filtro_sup_area: q = q.filter(Reporte.sup_area.ilike(f"%{filtro_sup_area}%"))
             if filtro_pastor_zona: q = q.filter(Reporte.pastor_zona.ilike(f"%{filtro_pastor_zona}%"))
-            reportes = q.order_by(Reporte.distrito, Reporte.zona, Reporte.fecha).all()
+            reportes = _dedup_reportes(q.order_by(Reporte.distrito, Reporte.zona, Reporte.fecha).all())
 
             # Post-filtro por ayuda de pastor (no es columna de reporte)
             if filtro_ayuda:
