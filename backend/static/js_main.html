@@ -62,6 +62,31 @@ function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()
 function todayStr(){return today();}
 function fom(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-01';}
 function fom30(){var d=new Date();d.setDate(d.getDate()-30);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _fechaLocal(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function _fechaLunes(d){d=d?new Date(d):new Date();var dia=d.getDay();var dif=dia===0?6:dia-1;var l=new Date(d);l.setDate(d.getDate()-dif);return l;}
+function lunesActual(){return _fechaLocal(_fechaLunes(new Date()));}
+function domingoActual(){var l=_fechaLunes(new Date());var dm=new Date(l);dm.setDate(l.getDate()+6);return _fechaLocal(dm);}
+function setRepPeriodo(){
+  var p=(document.getElementById('rPeriodo')||{}).value||'semana';
+  var hoy=new Date(), d1, d2;
+  if(p==='semana'){var l=_fechaLunes(hoy);var dm=new Date(l);dm.setDate(l.getDate()+6);d1=l;d2=dm;}
+  else if(p==='semana_ant'){var l2=_fechaLunes(hoy);l2.setDate(l2.getDate()-7);var dm2=new Date(l2);dm2.setDate(l2.getDate()+6);d1=l2;d2=dm2;}
+  else if(p==='mes'){d1=new Date(hoy.getFullYear(),hoy.getMonth(),1);d2=new Date(hoy.getFullYear(),hoy.getMonth()+1,0);}
+  else if(p==='mes_ant'){d1=new Date(hoy.getFullYear(),hoy.getMonth()-1,1);d2=new Date(hoy.getFullYear(),hoy.getMonth(),0);}
+  else return;
+  var a=document.getElementById('rD'), b=document.getElementById('rH');
+  if(a)a.value=_fechaLocal(d1); if(b)b.value=_fechaLocal(d2);
+  loadRep();
+}
+function moverSemanaRep(delta){
+  var a=document.getElementById('rD'), b=document.getElementById('rH');
+  if(!a||!b||!a.value||!b.value)return;
+  var d1=new Date(a.value+'T12:00:00'), d2=new Date(b.value+'T12:00:00');
+  d1.setDate(d1.getDate()+delta*7); d2.setDate(d2.getDate()+delta*7);
+  a.value=_fechaLocal(d1); b.value=_fechaLocal(d2);
+  var p=document.getElementById('rPeriodo'); if(p)p.value='personalizado';
+  loadRep();
+}
 function mesNombre(s){if(!s)return'';var m=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];try{return m[new Date(s+'T12:00:00').getMonth()];}catch(e){return s;}}
 function exportXLS(data,name,file){
   loading(true);
@@ -977,7 +1002,7 @@ function renderReportes(el){
   el.innerHTML=`<div class="mod-hdr"><h2><i class="fas fa-file-alt"></i> Reporte de Grupos</h2>
   <div class="mod-acts">
       ${permisoEditar()?`<button class="btn btn-ok btn-sm" onclick="newReporte()"><i class="fas fa-plus"></i> Nuevo</button>`:''}
-    <button class="btn btn-in btn-sm" onclick="exportXLS(_rep,'Reportes','reportes')"><i class="fas fa-file-excel"></i> Excel</button>
+    <button class="btn btn-in btn-sm" onclick="exportXLS(getVisibleRep(),'Reportes','reportes')"><i class="fas fa-file-excel"></i> Excel</button>
     <button class="btn btn-er btn-sm" onclick="imprimirReportes()"><i class="fas fa-file-pdf"></i> PDF</button>
     <button class="btn btn-ac btn-sm" onclick="abrirFiltroAsistencia()" style="background:linear-gradient(135deg,#7d3c98,#5b2c6f);border:none"><i class="fas fa-search-plus"></i> Asistencia Hoy</button>
     <button class="btn btn-pr btn-sm" onclick="reporteModPrevio='reportes';nav('cuadre',true)" style="background:linear-gradient(135deg,#1a3a5c,#2563a8);border:none"><i class="fas fa-calculator"></i> Cuadre Domingo</button>
@@ -1050,9 +1075,18 @@ function renderReportes(el){
     <!-- FILTROS -->
     <div class="fr" style="padding:10px 14px;border-bottom:1px solid var(--brd)">
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;width:100%">
-        <div class="sb2" style="flex:1;min-width:180px;position:relative"><i class="fas fa-search"></i><input type="text" id="repSearch" placeholder="Buscar líder, código, anfitrión..." oninput="buscarRepSugerencias(this.value);_qRep=this.value;renderRepTable(_rep)" autocomplete="off"><div id="repSearchSug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:2px solid var(--pr2);border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.15)"></div></div>
-        <input type="date" class="fdt" id="rD" value="${fom30()}" title="Desde">
-        <input type="date" class="fdt" id="rH" value="${today()}" title="Hasta">
+        <div class="sb2" style="flex:1;min-width:180px;position:relative"><i class="fas fa-search"></i><input type="text" id="repSearch" placeholder="Buscar líder, código, anfitrión..." oninput="buscarRepSugerencias(this.value);_qRep=this.value;refrescarRepVista()" autocomplete="off"><div id="repSearchSug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#fff;border:2px solid var(--pr2);border-radius:0 0 10px 10px;max-height:200px;overflow-y:auto;z-index:999;box-shadow:0 8px 24px rgba(0,0,0,.15)"></div></div>
+        <select class="fsl" id="rPeriodo" style="min-width:170px" onchange="setRepPeriodo()">
+          <option value="semana" selected>📅 Semana actual</option>
+          <option value="semana_ant">Semana anterior</option>
+          <option value="mes">Mes actual</option>
+          <option value="mes_ant">Mes anterior</option>
+          <option value="personalizado">Rango personalizado</option>
+        </select>
+        <button class="btn btn-ol btn-sm" onclick="moverSemanaRep(-1)" title="Semana anterior" style="padding:6px 9px"><i class="fas fa-chevron-left"></i></button>
+        <input type="date" class="fdt" id="rD" value="${lunesActual()}" title="Desde">
+        <input type="date" class="fdt" id="rH" value="${domingoActual()}" title="Hasta">
+        <button class="btn btn-ol btn-sm" onclick="moverSemanaRep(1)" title="Semana siguiente" style="padding:6px 9px"><i class="fas fa-chevron-right"></i></button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px">
         <select class="fsl" id="rDist" style="flex:1;min-width:120px" onchange="actualizarSelectores()">
@@ -1075,11 +1109,11 @@ function renderReportes(el){
           <option value="">👥 Sup. Sector: Todos</option>
           ${[...new Set(APP.hermanos.map(h=>h['Sup SectorL']).filter(Boolean))].sort().map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('')}
         </select>
-        <select class="fsl" id="rReu" style="flex:1;min-width:110px">
+        <select class="fsl" id="rReu" style="flex:1;min-width:110px" onchange="refrescarRepVista()">
           <option value="">📋 Reunión: Todas</option>
           ${TIPO_REUNION.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join('')}
         </select>
-        <select class="fsl" id="rMetodo" style="flex:1;min-width:110px">
+        <select class="fsl" id="rMetodo" style="flex:1;min-width:110px" onchange="refrescarRepVista()">
           <option value="">📱 Reporte: Todos</option>
           ${METODO_REPORTE.map(m=>`<option value="${esc(m)}">${esc(m)}</option>`).join('')}
         </select>
@@ -1109,7 +1143,7 @@ function switchRepTab(tab){
     btn.style.color=active?'var(--pr)':'var(--tx2)';
     btn.style.borderBottom=active?'2px solid var(--pr)':'2px solid transparent';
   });
-  renderRepTable(_rep);
+  refrescarRepVista();
 }
 function abrirFiltroAsistencia(){
   const panel=document.getElementById('panelAsistencia');
@@ -1456,27 +1490,43 @@ function imprimirAsistenciaHoy(fecha,area,sector){
 }
 
 function loadRep(){
-  var f={desde:g('rD')||fom(),hasta:g('rH')||today()};
-  var l=g('rL'),ss=g('rSS'),pz=g('rPZ'),di=g('rDist'),zo=g('rZona');
-  if(l)f.lider=l;if(ss)f.supSector=ss;if(pz)f.pastorZona=pz;
-  if(di)f.distrito=di;if(zo)f.zona=zo;if(g('rPend'))f.pendientes=true;
-  var ck='rpt_v2_'+f.desde+'_'+f.hasta+(f.pastorZona?'_pz:'+f.pastorZona:'')+(f.supSector?'_ss:'+f.supSector:'')+(f.distrito?'_di:'+f.distrito:'')+(f.zona?'_zo:'+f.zona:'')+(f.lider?'_ld:'+f.lider:'');
+  var f={desde:g('rD')||lunesActual(),hasta:g('rH')||domingoActual()};
+  var l=g('rL'),ss=g('rSS'),sa=g('rSA'),pz=g('rPZ'),di=g('rDist'),zo=g('rZona');
+  if(l)f.lider=l;if(ss)f.supSector=ss;if(sa)f.supArea=sa;if(pz)f.pastorZona=pz;
+  if(di)f.distrito=di;if(zo)f.zona=zo;
+  var ck='rpt_v3_'+f.desde+'_'+f.hasta+(f.pastorZona?'_pz:'+f.pastorZona:'')+(f.supSector?'_ss:'+f.supSector:'')+(f.supArea?'_sa:'+f.supArea:'')+(f.distrito?'_di:'+f.distrito:'')+(f.zona?'_zo:'+f.zona:'')+(f.lider?'_ld:'+f.lider:'');
   var cached=sessionStorage.getItem(ck);
   var v=parseInt(sessionStorage.getItem('rpt_ver')||'0');
   if(cached&&Date.now()-parseInt(sessionStorage.getItem(ck+'_t')||'0')<30000){
-    try{var cd=JSON.parse(cached);if(cd.v===v){_rep=cd.d;renderRepTable(_rep);renderRepRes(_rep);return;}}catch(e){}
+    try{var cd=JSON.parse(cached);if(cd.v===v){_rep=cd.d;refrescarRepVista();return;}}catch(e){}
   }
-  loading(true);call('getReportes',f,function(_,d){loading(false);_rep=Array.isArray(d)?d:[];try{sessionStorage.setItem(ck,JSON.stringify({v:d.v||v,d:_rep}));sessionStorage.setItem(ck+'_t',Date.now());}catch(e){}var pend=_rep.filter(function(r){return r['Ofrenda Recibida']==='Pendiente'||r['Ofrenda Recibida']==='';});var bt=document.getElementById('badge_todos'),bp=document.getElementById('badge_pendientes');if(bt)bt.textContent=_rep.length;if(bp)bp.textContent=pend.length;renderRepTable(_rep);renderRepRes(_rep);});
+  loading(true);call('getReportes',f,function(_,d){loading(false);_rep=Array.isArray(d)?d:[];try{sessionStorage.setItem(ck,JSON.stringify({v:d.v||v,d:_rep}));sessionStorage.setItem(ck+'_t',Date.now());}catch(e){}refrescarRepVista();});
+}
+function refrescarRepVista(){
+  var d=getVisibleRep();
+  renderRepTable(d);
+  renderRepRes(d);
+  var pend=_rep.filter(function(r){return r['Ofrenda Recibida']==='Pendiente'||r['Ofrenda Recibida']==='';});
+  var bt=document.getElementById('badge_todos'),bp=document.getElementById('badge_pendientes');
+  if(bt)bt.textContent=_rep.length;if(bp)bp.textContent=pend.length;
+  var fi=document.getElementById('filtrosActivos');
+  if(fi){
+    var parts=[];
+    if(_qRep)parts.push('Buscar: '+esc(_qRep));
+    var di=g('rDist'),zo=g('rZona'),pz=g('rPZ'),sa=g('rSA'),ss=g('rSS'),re=g('rReu'),me=g('rMetodo');
+    if(di)parts.push('Distrito '+esc(di));if(zo)parts.push('Zona '+esc(zo));if(pz)parts.push('Pastor '+esc(pz));
+    if(sa)parts.push('Ayuda '+esc(sa));if(ss)parts.push('Sup. Sector '+esc(ss));if(re)parts.push('Reunión: '+esc(re));if(me)parts.push('Reporte: '+esc(me));
+    if(parts.length){fi.style.display='flex';fi.innerHTML='<i class="fas fa-filter"></i> '+parts.join(' · ')+' <span style="margin-left:6px;font-weight:700">('+d.length+' reportes · '+fmtQ(d.reduce(function(s,r){return s+num(r['Ofrenda Total']);},0))+')</span> <span style="margin-left:auto;color:var(--err);cursor:pointer;font-weight:700" onclick="limpiarFiltrosRep()">Limpiar</span>';}
+    else{fi.style.display='none';}
+  }
 }
 
 function limpiarFiltrosRep(){
-  ['rDist','rZona','rPZ','rSA','rSS','rL'].forEach(id=>{
-    const el=document.getElementById(id);
-    if(el)el.value='';
-  });
-  const fi=document.getElementById('filtrosActivos');
-  if(fi)fi.style.display='none';
-  loadRep();
+  ['rDist','rZona','rPZ','rSA','rSS','rL','rReu','rMetodo'].forEach(function(id){var el=document.getElementById(id);if(el)el.value='';});
+  _qRep='';
+  var s=document.getElementById('repSearch'); if(s)s.value='';
+  var p=document.getElementById('rPeriodo'); if(p)p.value='semana';
+  setRepPeriodo();
 }
 
 function actualizarSelectores(){loadRep();}
@@ -1528,8 +1578,8 @@ function renderRepRes(d){
     +'<div>'+desglose('Zona','Zona')+'</div>'
     +'</div>';
 }
-function renderRepTable(){
-  const data=getVisibleRep();
+function renderRepTable(dataIn){
+  const data=dataIn||getVisibleRep();
   const tb=document.getElementById('repTb');if(!tb)return;
   if(!data.length){
     const msg=_repTab==='pendientes'?'Sin reportes con ofrenda pendiente 👍':'No hay reportes en este período';
