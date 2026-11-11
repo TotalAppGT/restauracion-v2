@@ -2345,9 +2345,15 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                 try:
                     d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date(); q = q.filter(Reporte.fecha <= d_hasta)
                 except: pass
-            if distrito_f: q = q.filter(Reporte.distrito == distrito_f)
-            if zona_f: q = q.filter(Reporte.zona == zona_f)
             reportes = _dedup_reportes(q.all())
+            if distrito_f or zona_f:
+                _hm = {_norm_code(h.codigo_lead): h for h in db.query(Hermano).all() if h.codigo_lead}
+                def _rdz(r):
+                    h = _hm.get(_norm_code(r.codigo))
+                    return (str(r.distrito or (h.distrito if h else "") or "").strip(),
+                            str(r.zona or (h.zona if h else "") or "").strip())
+                if distrito_f: reportes = [r for r in reportes if _rdz(r)[0] == distrito_f]
+                if zona_f: reportes = [r for r in reportes if _rdz(r)[1] == zona_f]
 
             # Configuración
             cfg = {}
@@ -2663,13 +2669,17 @@ def dispatch(data: dict, db: Session = Depends(get_db)):
                     d_hasta = datetime.strptime(hasta, "%Y-%m-%d").date()
                     q = q.filter(Reporte.fecha <= d_hasta)
                 except: pass
-            if filtro_distrito: q = q.filter(Reporte.distrito == filtro_distrito)
-            if filtro_zona: q = q.filter(Reporte.zona == filtro_zona)
             if filtro_lider: q = q.filter(Reporte.lider.ilike(f"%{filtro_lider}%"))
-            if filtro_sup_sector: q = q.filter(Reporte.sup_sector.ilike(f"%{filtro_sup_sector}%"))
-            if filtro_sup_area: q = q.filter(Reporte.sup_area.ilike(f"%{filtro_sup_area}%"))
-            if filtro_pastor_zona: q = q.filter(Reporte.pastor_zona.ilike(f"%{filtro_pastor_zona}%"))
             reportes = _dedup_reportes(q.order_by(Reporte.distrito, Reporte.zona, Reporte.fecha).all())
+            if filtro_distrito or filtro_zona or filtro_sup_sector or filtro_sup_area or filtro_pastor_zona:
+                def _rv(r, attr):
+                    h = _resolve_hermano(r)
+                    return str(getattr(r, attr, "") or (getattr(h, attr, "") if h else "") or "").strip()
+                if filtro_distrito: reportes = [r for r in reportes if _rv(r, "distrito") == filtro_distrito]
+                if filtro_zona: reportes = [r for r in reportes if _rv(r, "zona") == filtro_zona]
+                if filtro_sup_sector: reportes = [r for r in reportes if filtro_sup_sector.lower() in _rv(r, "sup_sector").lower()]
+                if filtro_sup_area: reportes = [r for r in reportes if filtro_sup_area.lower() in _rv(r, "sup_area").lower()]
+                if filtro_pastor_zona: reportes = [r for r in reportes if filtro_pastor_zona.lower() in _rv(r, "pastor_zona").lower()]
 
             # Post-filtro por ayuda de pastor (no es columna de reporte)
             if filtro_ayuda:
